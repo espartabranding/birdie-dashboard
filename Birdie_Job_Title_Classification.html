@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Birdie.ai — Job Title Classification Scale</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f4f4f5;
+            color: #111827;
+            padding: 48px 40px;
+            font-size: 15px;
+        }
+
+        /* ── Header ── */
+        .header {
+            background: #111827;
+            color: white;
+            padding: 36px 44px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            text-align: center;
+            border-bottom: 3px solid #374151;
+        }
+        .header h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase; }
+        .header p  { font-size: 13px; color: #9ca3af; margin-top: 8px; letter-spacing: 0.3px; }
+
+        /* ── Action bar ── */
+        .action-bar {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-bottom: 16px;
+        }
+        .btn {
+            padding: 10px 22px;
+            border-radius: 4px;
+            border: none;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            letter-spacing: 0.3px;
+            transition: opacity 0.15s, transform 0.1s;
+        }
+        .btn:hover  { opacity: 0.85; }
+        .btn:active { transform: scale(0.98); }
+        .btn-save   { background: #111827; color: #fff; }
+        .btn-reset  { background: #fff; color: #374151; border: 1px solid #d1d5db; }
+        .btn-add    { background: #fff; color: #111827; border: 1px solid #d1d5db; }
+
+        /* ── Table ── */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 6px;
+            overflow: hidden;
+            table-layout: fixed;
+            min-width: 860px;
+        }
+
+        thead tr { background: #111827; }
+        thead th {
+            padding: 14px 18px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #9ca3af;
+        }
+        thead th:nth-child(1) { width: 17%; }
+        thead th:nth-child(2) { width: 5%;  }
+        thead th:nth-child(3) { width: 19%; }
+        thead th:nth-child(4) { width: 16%; }
+        thead th:nth-child(5) { width: 37%; }
+        thead th:nth-child(6) { width: 6%; text-align: center; }
+
+        tbody tr { border-bottom: 1px solid #f3f4f6; transition: background 0.1s; }
+        tbody tr:hover { background: #fafafa; }
+        tbody td { padding: 14px 18px; font-size: 15px; vertical-align: middle; }
+        td.action-cell { text-align: center; vertical-align: middle; padding: 8px 10px; }
+
+        tr.section-header td {
+            background: #f3f4f6;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #fff;
+            padding: 11px 18px;
+            border-top: none;
+            border-bottom: 1px solid rgba(255,255,255,0.12);
+        }
+
+        /* ── Section header colours per segment (set via JS data-seg) ── */
+        tr.section-header[data-seg="seg0"]                              { background: #0f172a; }
+        tr.section-header[data-seg="dm1"]                               { background: #1e3a8a; }
+        tr.section-header[data-seg="dm2"]                               { background: #1e40af; }
+        tr.section-header[data-seg="dm3-head"],
+        tr.section-header[data-seg="dm3-dir"]                           { background: #0369a1; }
+        tr.section-header[data-seg="cha"]                               { background: #4338ca; }
+        tr.section-header[data-seg="chb"]                               { background: #065f46; }
+        tr.section-header[data-seg="chc-pri"],
+        tr.section-header[data-seg="chc-sec"]                           { background: #0e7490; }
+        tr.section-header[data-seg="out-below-hi"],
+        tr.section-header[data-seg="out-below-lo"]                      { background: #78350f; }
+        tr.section-header[data-seg="out-periph"]                        { background: #374151; }
+
+        /* ── Drag handle ── */
+        .drag-handle {
+            display: inline-flex;
+            align-items: center;
+            margin-right: 10px;
+            color: #d1d5db;
+            cursor: grab;
+            font-size: 15px;
+            user-select: none;
+            vertical-align: middle;
+            letter-spacing: 2px;
+            transition: color 0.15s;
+        }
+        .drag-handle:hover { color: #6b7280; }
+        tr[draggable="true"] { cursor: default; }
+
+        /* ── Slider ── */
+        .slider-wrap { display: flex; align-items: center; gap: 12px; }
+
+        input[type="range"].bar-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            flex: 1;
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+            border: none;
+        }
+        input[type="range"].bar-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--thumb-color, #374151);
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            border: 2px solid #fff;
+            transition: transform 0.1s;
+        }
+        input[type="range"].bar-slider::-webkit-slider-thumb:hover { transform: scale(1.15); }
+        input[type="range"].bar-slider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--thumb-color, #374151);
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            border: 2px solid #fff;
+        }
+        input[type="range"].bar-slider:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .slider-val {
+            font-size: 13px;
+            font-weight: 700;
+            min-width: 34px;
+            text-align: right;
+            color: #374151;
+            font-variant-numeric: tabular-nums;
+            font-feature-settings: "tnum";
+        }
+
+        /* Static bar (Outside Peripheral) */
+        .bar-wrap { width:100%; height:6px; background:#f3f4f6; border-radius:3px; overflow:hidden; }
+        .bar { height:100%; border-radius:3px; }
+
+        /* ── Score — plain number ── */
+        .score {
+            display: inline-block;
+            font-size: 14px;
+            font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            color: #111827;
+            min-width: 24px;
+            text-align: center;
+        }
+
+        /* ── Classification label ── */
+        .cls {
+            display: inline-block;
+            padding: 3px 9px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+            text-transform: uppercase;
+            line-height: 1.5;
+            background: #f3f4f6;
+            color: #374151;
+            border: 1px solid #e5e7eb;
+        }
+
+        .sub-name { font-weight: 800; font-size: 16px; color: #111827; letter-spacing: -0.01em; }
+        .sub-role { font-size: 12px; font-weight: 600; color: #374151; margin-top: 3px; }
+        .sub-desc { font-size: 12px; color: #9ca3af; margin-top: 4px; line-height: 1.55; }
+        .cargo    { font-weight: 600; font-size: 15px; }
+        .score-na { color: #d1d5db; font-size: 15px; font-weight: 600; }
+
+        /* ══ Row left-border — segment colour ══ */
+        .row-seg0   { border-left: 4px solid #1e3a8a; }
+        .row-dm1    { border-left: 4px solid #991b1b; }
+        .row-dm2    { border-left: 4px solid #c2410c; }
+        .row-dm3    { border-left: 4px solid #92400e; }
+        .row-cha    { border-left: 4px solid #4338ca; }
+        .row-chb    { border-left: 4px solid #065f46; }
+        .row-chc    { border-left: 4px solid #0e7490; }
+        .row-fora-b { border-left: 4px solid #d97706; background: #fffbeb; }
+        .row-fora-p { border-left: 4px solid #9ca3af; background: #f9fafb; }
+
+        /* ── Classification badge colours ── */
+        .c-seg0   { background: #1e3a8a; color: #fff; border: none; }
+        .c-dm1    { background: #991b1b; color: #fff; border: none; }
+        .c-dm2    { background: #c2410c; color: #fff; border: none; }
+        .c-dm3    { background: #92400e; color: #fff; border: none; }
+        .c-cha    { background: #4338ca; color: #fff; border: none; }
+        .c-chb    { background: #065f46; color: #fff; border: none; }
+        .c-chc    { background: #0e7490; color: #fff; border: none; }
+        .c-fora-b { background: #78350f; color: #fff; border: none; }
+        .c-fora-p { background: #374151; color: #fff; border: none; }
+
+        /* Static bar colours */
+        .bar-seg0   { background: #1e3a8a; }
+        .bar-fora-b { background: #fbbf24; }
+        .bar-fora-p { background: #9ca3af; }
+
+        /* ── Responsive ── */
+
+        /* Table wrapper enables horizontal scroll on small screens */
+        .table-wrapper {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 6px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.07);
+        }
+
+        @media (max-width: 1200px) {
+            body { padding: 32px 24px; }
+            .si-title { font-size: 26px; }
+        }
+
+        @media (max-width: 900px) {
+            body { padding: 24px 16px; }
+            .header { padding: 28px 28px; }
+            .header h1 { font-size: 18px; }
+            .si-title { font-size: 22px; }
+            .si-grid { flex-direction: column; gap: 10px; }
+            .si-card { flex: none; }
+            tr.seg-intro td { padding: 18px 18px 14px; }
+            .legend { flex-wrap: wrap; gap: 8px 16px; font-size: 12px; }
+        }
+
+        @media (max-width: 640px) {
+            body { padding: 14px 10px; }
+            .header { padding: 18px 16px; border-radius: 4px; }
+            .header h1 { font-size: 14px; letter-spacing: 0.3px; }
+            .header p { font-size: 11px; }
+            .action-bar { flex-wrap: wrap; gap: 8px; }
+            .btn { font-size: 12px; padding: 8px 14px; flex: 1 1 auto; text-align: center; }
+            .si-title { font-size: 19px; margin-bottom: 14px; }
+            .si-label { font-size: 9px; }
+            .si-card-tag { font-size: 11px; }
+            .si-card-name { font-size: 13px; }
+            .si-card-desc { font-size: 11px; }
+            tr.seg-intro td { padding: 16px 12px 12px; }
+            tr.section-header td { font-size: 11px; padding: 9px 12px; }
+            .modal {
+                width: calc(100vw - 24px);
+                padding: 24px 18px;
+                max-height: 90vh;
+                overflow-y: auto;
+            }
+            .modal h2 { font-size: 17px; }
+            #toast { bottom: 14px; right: 14px; padding: 10px 14px; font-size: 12px; }
+            .legend { padding: 14px 16px; font-size: 12px; flex-direction: column; gap: 8px; }
+        }
+
+        /* ── Legend ── */
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 24px;
+            margin-top: 20px;
+            padding: 18px 22px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+            font-size: 13px;
+            color: #374151;
+        }
+        .legend-item { display:flex; align-items:center; gap:9px; }
+        .legend-dot  { width:12px; height:12px; border-radius:2px; flex-shrink:0; }
+
+        /* ── Toast ── */
+        #toast {
+            position: fixed; bottom: 28px; right: 28px;
+            background: #111827; color: #fff;
+            padding: 12px 22px; border-radius: 4px;
+            font-size: 14px; font-weight: 600;
+            opacity: 0; transform: translateY(8px);
+            transition: opacity 0.25s, transform 0.25s;
+            pointer-events: none; z-index: 999;
+        }
+        #toast.show { opacity: 1; transform: translateY(0); }
+
+        /* ── Drag & drop ── */
+        tr[draggable="true"]  { cursor: grab; }
+        tr[draggable="true"]:active { cursor: grabbing; }
+        tr.drag-over { outline: 2px dashed #6b7280; outline-offset: -2px; background: #f9fafb !important; }
+        tr.dragging  { opacity: 0.3; }
+
+        /* ── Delete button ── */
+        .btn-del {
+            background: none; border: none; color: #d1d5db;
+            font-size: 18px; cursor: pointer; padding: 2px 8px;
+            border-radius: 4px; line-height: 1;
+            transition: color 0.15s, background 0.15s;
+        }
+        .btn-del:hover { color: #374151; background: #f3f4f6; }
+
+        /* ── Modal ── */
+        .modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(17,24,39,0.6); z-index: 200;
+            align-items: center; justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: #fff; border-radius: 6px; padding: 36px 40px;
+            width: 500px; max-width: 95vw;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.2);
+        }
+        .modal h2  { font-size: 20px; font-weight: 700; margin-bottom: 4px; color: #111827; }
+        .modal p.modal-sub { font-size: 13px; color: #6b7280; margin-bottom: 24px; line-height: 1.6; }
+        .modal label {
+            display: block; font-size: 11px; font-weight: 700; color: #374151;
+            margin-top: 18px; margin-bottom: 6px;
+            text-transform: uppercase; letter-spacing: 0.07em;
+        }
+        .modal input[type="text"],
+        .modal select,
+        .modal input[type="number"] {
+            width: 100%; padding: 10px 13px; border: 1px solid #d1d5db;
+            border-radius: 4px; font-size: 15px; color: #111827;
+            outline: none; transition: border-color 0.15s;
+        }
+        .modal input:focus, .modal select:focus { border-color: #374151; box-shadow: 0 0 0 3px #f3f4f6; }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 28px; }
+
+        /* ── Segment intro / index row ── */
+        tr.seg-intro td {
+            padding: 22px 24px 18px;
+            background: #f8fafc;
+            border-top: 3px solid #e2e8f0;
+            border-bottom: 2px solid #e2e8f0;
+            vertical-align: top;
+        }
+        tr.seg-intro:hover { background: #f8fafc !important; }
+        .si-label {
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: #94a3b8;
+            margin-bottom: 6px;
+        }
+        .si-title {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            line-height: 1.05;
+            letter-spacing: -0.02em;
+        }
+        /* Segment title color per group */
+        tr.seg-intro[data-seg="dm1"]          .si-title { color: #991b1b; }
+        tr.seg-intro[data-seg="cha"]          .si-title { color: #4338ca; }
+        tr.seg-intro[data-seg="out-below-hi"] .si-title { color: #78350f; }
+
+        .si-grid { display: flex; gap: 14px; }
+        .si-card {
+            flex: 1;
+            padding: 14px 18px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid;
+            border-radius: 0 4px 4px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .si-card-tag {
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 6px;
+        }
+        .si-card-name {
+            font-size: 15px;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 6px;
+        }
+        .si-card-desc {
+            font-size: 12px;
+            color: #6b7280;
+            line-height: 1.55;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Birdie.ai — Job Title Classification Scale</h1>
+    <p>Lead Classification Ruleset v2.1 &nbsp;·&nbsp; March 2026</p>
+</div>
+
+<div class="action-bar">
+    <button class="btn btn-reset" onclick="resetAll()">↺ Reset All</button>
+    <button class="btn btn-add"   onclick="showAddModal()">+ Add Title</button>
+    <button class="btn btn-save"  onclick="saveConfig()">→ View Results</button>
+</div>
+
+<div class="table-wrapper">
+<table>
+<thead>
+    <tr>
+        <th>Job Title</th>
+        <th>D1</th>
+        <th>Custom Weight</th>
+        <th>Classification</th>
+        <th>Sub-classification · Name &amp; Explanation</th>
+        <th></th>
+    </tr>
+</thead>
+<tbody>
+
+
+<!-- ══ SEG 1 DM-1 ══ -->
+<tr class="seg-intro" data-seg="dm1"><td colspan="6">
+    <div class="si-label">Segment 1</div>
+    <div class="si-title">Decision Makers</div>
+    <div class="si-grid">
+        <div class="si-card" style="border-left-color:#991b1b;">
+            <div class="si-card-tag" style="color:#991b1b;">DM-A · Strategic Buyer</div>
+            <div class="si-card-name">C-Level / VP</div>
+            <div class="si-card-desc">Opens the budget but needs DM-C to validate. Focus on NPS, churn and strategic decision-making. No demo. <em>"What will your board ask about CX in 2026?"</em></div>
+        </div>
+        <div class="si-card" style="border-left-color:#c2410c;">
+            <div class="si-card-tag" style="color:#c2410c;">DM-B · Operational Buyer</div>
+            <div class="si-card-name">VP Primary</div>
+            <div class="si-card-desc">Has urgency and can create a bottom-up project. Focus on cost per contact, deflection and QA. <em>"How much do you spend per ticket today?"</em></div>
+        </div>
+        <div class="si-card" style="border-left-color:#92400e;">
+            <div class="si-card-tag" style="color:#92400e;">DM-C · Technical Buyer</div>
+            <div class="si-card-name">Head / Director</div>
+            <div class="si-card-desc">Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em></div>
+        </div>
+    </div>
+</td></tr>
+<tr class="section-header"><td colspan="5">▌ SEG 1 — DM-A · Strategic Buyer</td></tr>
+
+<tr class="row-dm1">
+    <td class="cargo">Chief Customer Officer</td>
+    <td><span class="score c-dm1">40</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="40" value="40" step="0.1" class="bar-slider" data-color="#ef4444" oninput="updateSlider(this)"><span class="slider-val">40.0</span></div></td>
+    <td><span class="cls c-dm1">Seg 1 · DM-A</span></td>
+    <td><div class="sub-name">DM-A</div><div class="sub-role">Strategic Buyer</div><div class="sub-desc">C-Level executive. Maximum budget authority. Strategic narrative, board-level outcomes, governance visibility. No demo.</div></td>
+</tr>
+<tr class="row-dm1">
+    <td class="cargo">Chief Experience Officer</td>
+    <td><span class="score c-dm1">40</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="40" value="40" step="0.1" class="bar-slider" data-color="#ef4444" oninput="updateSlider(this)"><span class="slider-val">40.0</span></div></td>
+    <td><span class="cls c-dm1">Seg 1 · DM-A</span></td>
+    <td><div class="sub-name">DM-A</div><div class="sub-role">Strategic Buyer</div><div class="sub-desc">C-Level executive. Maximum budget authority. Strategic narrative, board-level outcomes, governance visibility. No demo.</div></td>
+</tr>
+<tr class="row-dm1">
+    <td class="cargo">Chief Customer Service Officer</td>
+    <td><span class="score c-dm1">40</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="40" value="40" step="0.1" class="bar-slider" data-color="#ef4444" oninput="updateSlider(this)"><span class="slider-val">40.0</span></div></td>
+    <td><span class="cls c-dm1">Seg 1 · DM-A</span></td>
+    <td><div class="sub-name">DM-A</div><div class="sub-role">Strategic Buyer</div><div class="sub-desc">C-Level executive. Maximum budget authority. Strategic narrative, board-level outcomes, governance visibility. No demo.</div></td>
+</tr>
+
+<tr class="row-dm1">
+    <td class="cargo">VP Customer Experience</td>
+    <td><span class="score c-dm1">35</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="35" value="35" step="0.1" class="bar-slider" data-color="#ef4444" oninput="updateSlider(this)"><span class="slider-val">35.0</span></div></td>
+    <td><span class="cls c-dm1">Seg 1 · DM-A</span></td>
+    <td><div class="sub-name">DM-A</div><div class="sub-role">Strategic Buyer</div><div class="sub-desc">Opens the budget but needs DM-C to validate. Focus on NPS, churn and strategic decision-making. No demo. <em>"What will your board ask about CX in 2026?"</em></div></td>
+</tr>
+
+<!-- ══ SEG 1 DM-2 ══ -->
+<tr class="section-header"><td colspan="5">▌ SEG 1 — DM-B · Operational Buyer</td></tr>
+
+<tr class="row-dm2">
+    <td class="cargo">VP Customer Service</td>
+    <td><span class="score c-dm2">35</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="35" value="35" step="0.1" class="bar-slider" data-color="#f97316" oninput="updateSlider(this)"><span class="slider-val">35.0</span></div></td>
+    <td><span class="cls c-dm2">Seg 1 · DM-B</span></td>
+    <td><div class="sub-name">DM-B</div><div class="sub-role">Operational Buyer</div><div class="sub-desc">Has urgency and can create a bottom-up project. Focus on cost per contact, deflection and QA. <em>"How much do you spend per ticket today?"</em></div></td>
+</tr>
+<tr class="row-dm2">
+    <td class="cargo">VP Customer Service Operations</td>
+    <td><span class="score c-dm2">35</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="35" value="35" step="0.1" class="bar-slider" data-color="#f97316" oninput="updateSlider(this)"><span class="slider-val">35.0</span></div></td>
+    <td><span class="cls c-dm2">Seg 1 · DM-B</span></td>
+    <td><div class="sub-name">DM-B</div><div class="sub-role">Operational Buyer</div><div class="sub-desc">Has urgency and can create a bottom-up project. Focus on cost per contact, deflection and QA. <em>"How much do you spend per ticket today?"</em></div></td>
+</tr>
+<tr class="row-dm2">
+    <td class="cargo">VP Customer Operations</td>
+    <td><span class="score c-dm2">35</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="35" value="35" step="0.1" class="bar-slider" data-color="#f97316" oninput="updateSlider(this)"><span class="slider-val">35.0</span></div></td>
+    <td><span class="cls c-dm2">Seg 1 · DM-B</span></td>
+    <td><div class="sub-name">DM-B</div><div class="sub-role">Operational Buyer</div><div class="sub-desc">Has urgency and can create a bottom-up project. Focus on cost per contact, deflection and QA. <em>"How much do you spend per ticket today?"</em></div></td>
+</tr>
+
+<!-- ══ SEG 1 DM-3 HEAD ══ -->
+<tr class="section-header"><td colspan="5">▌ SEG 1 — DM-C · Technical Buyer (Head / Sr Dir)</td></tr>
+
+<tr class="row-dm3">
+    <td class="cargo">Head of Customer Experience</td>
+    <td><span class="score c-dm3">28</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="28" value="28" step="0.1" class="bar-slider" data-color="#f59e0b" oninput="updateSlider(this)"><span class="slider-val">28.0</span></div></td>
+    <td><span class="cls c-dm3">Seg 1 · DM-C</span></td>
+    <td><div class="sub-name">DM-C</div><div class="sub-role">Technical Buyer</div><div class="sub-desc">Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em></div></td>
+</tr>
+<tr class="row-dm3">
+    <td class="cargo">Head of Support</td>
+    <td><span class="score c-dm3">28</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="28" value="28" step="0.1" class="bar-slider" data-color="#f59e0b" oninput="updateSlider(this)"><span class="slider-val">28.0</span></div></td>
+    <td><span class="cls c-dm3">Seg 1 · DM-C</span></td>
+    <td><div class="sub-name">DM-C</div><div class="sub-role">Technical Buyer</div><div class="sub-desc">Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em></div></td>
+</tr>
+<tr class="row-dm3">
+    <td class="cargo">Head of Customer Service</td>
+    <td><span class="score c-dm3">28</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="28" value="28" step="0.1" class="bar-slider" data-color="#f59e0b" oninput="updateSlider(this)"><span class="slider-val">28.0</span></div></td>
+    <td><span class="cls c-dm3">Seg 1 · DM-C</span></td>
+    <td><div class="sub-name">DM-C</div><div class="sub-role">Technical Buyer</div><div class="sub-desc">Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em></div></td>
+</tr>
+
+<!-- ══ SEG 1 DM-3 DIRECTOR ══ -->
+<tr class="section-header"><td colspan="5">▌ SEG 1 — DM-C · Technical Buyer (Director)</td></tr>
+
+<tr class="row-dm3">
+    <td class="cargo">Director Customer Experience</td>
+    <td><span class="score c-dm3">20</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="20" value="20" step="0.1" class="bar-slider" data-color="#f59e0b" oninput="updateSlider(this)"><span class="slider-val">20.0</span></div></td>
+    <td><span class="cls c-dm3">Seg 1 · DM-C</span></td>
+    <td><div class="sub-name">DM-C</div><div class="sub-role">Technical Buyer</div><div class="sub-desc">Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em></div></td>
+</tr>
+<tr class="row-dm3">
+    <td class="cargo">Director of Customer Service</td>
+    <td><span class="score c-dm3">20</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="20" value="20" step="0.1" class="bar-slider" data-color="#f59e0b" oninput="updateSlider(this)"><span class="slider-val">20.0</span></div></td>
+    <td><span class="cls c-dm3">Seg 1 · DM-C</span></td>
+    <td><div class="sub-name">DM-C</div><div class="sub-role">Technical Buyer</div><div class="sub-desc">Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em></div></td>
+</tr>
+<tr class="row-dm3">
+    <td class="cargo">Director of Support</td>
+    <td><span class="score c-dm3">20</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="20" value="20" step="0.1" class="bar-slider" data-color="#f59e0b" oninput="updateSlider(this)"><span class="slider-val">20.0</span></div></td>
+    <td><span class="cls c-dm3">Seg 1 · DM-C</span></td>
+    <td><div class="sub-name">DM-C</div><div class="sub-role">Technical Buyer</div><div class="sub-desc">Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em></div></td>
+</tr>
+<tr class="row-dm3">
+    <td class="cargo">Director Customer Service Operations</td>
+    <td><span class="score c-dm3">20</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="20" value="20" step="0.1" class="bar-slider" data-color="#f59e0b" oninput="updateSlider(this)"><span class="slider-val">20.0</span></div></td>
+    <td><span class="cls c-dm3">Seg 1 · DM-C</span></td>
+    <td><div class="sub-name">DM-C</div><div class="sub-role">Technical Buyer</div><div class="sub-desc">Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em></div></td>
+</tr>
+<tr class="row-dm3">
+    <td class="cargo">Director of Support Services</td>
+    <td><span class="score c-dm3">20</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="20" value="20" step="0.1" class="bar-slider" data-color="#f59e0b" oninput="updateSlider(this)"><span class="slider-val">20.0</span></div></td>
+    <td><span class="cls c-dm3">Seg 1 · DM-C</span></td>
+    <td><div class="sub-name">DM-C</div><div class="sub-role">Technical Buyer</div><div class="sub-desc">Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em></div></td>
+</tr>
+<tr class="row-dm3">
+    <td class="cargo">Director Customer Support</td>
+    <td><span class="score c-dm3">20</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="20" value="20" step="0.1" class="bar-slider" data-color="#f59e0b" oninput="updateSlider(this)"><span class="slider-val">20.0</span></div></td>
+    <td><span class="cls c-dm3">Seg 1 · DM-C</span></td>
+    <td><div class="sub-name">DM-C</div><div class="sub-role">Technical Buyer</div><div class="sub-desc">Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em></div></td>
+</tr>
+<tr class="row-dm3">
+    <td class="cargo">Director Technical Support</td>
+    <td><span class="score c-dm3">20</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="20" value="20" step="0.1" class="bar-slider" data-color="#f59e0b" oninput="updateSlider(this)"><span class="slider-val">20.0</span></div></td>
+    <td><span class="cls c-dm3">Seg 1 · DM-C</span></td>
+    <td><div class="sub-name">DM-C</div><div class="sub-role">Technical Buyer</div><div class="sub-desc">Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em></div></td>
+</tr>
+<tr class="row-dm3">
+    <td class="cargo">Director Customer Care</td>
+    <td><span class="score c-dm3">20</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="20" value="20" step="0.1" class="bar-slider" data-color="#f59e0b" oninput="updateSlider(this)"><span class="slider-val">20.0</span></div></td>
+    <td><span class="cls c-dm3">Seg 1 · DM-C</span></td>
+    <td><div class="sub-name">DM-C</div><div class="sub-role">Technical Buyer</div><div class="sub-desc">Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em></div></td>
+</tr>
+<tr class="row-dm3">
+    <td class="cargo">Director of Operations Support</td>
+    <td><span class="score c-dm3">20</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="20" value="20" step="0.1" class="bar-slider" data-color="#f59e0b" oninput="updateSlider(this)"><span class="slider-val">20.0</span></div></td>
+    <td><span class="cls c-dm3">Seg 1 · DM-C</span></td>
+    <td><div class="sub-name">DM-C</div><div class="sub-role">Technical Buyer</div><div class="sub-desc">Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em></div></td>
+</tr>
+<tr class="row-dm3">
+    <td class="cargo">Director Customer Operations</td>
+    <td><span class="score c-dm3">20</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="20" value="20" step="0.1" class="bar-slider" data-color="#f59e0b" oninput="updateSlider(this)"><span class="slider-val">20.0</span></div></td>
+    <td><span class="cls c-dm3">Seg 1 · DM-C</span></td>
+    <td><div class="sub-name">DM-C</div><div class="sub-role">Technical Buyer</div><div class="sub-desc">Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em></div></td>
+</tr>
+<tr class="row-dm3">
+    <td class="cargo">Call Center Director</td>
+    <td><span class="score c-dm3">20</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="20" value="20" step="0.1" class="bar-slider" data-color="#f59e0b" oninput="updateSlider(this)"><span class="slider-val">20.0</span></div></td>
+    <td><span class="cls c-dm3">Seg 1 · DM-C</span></td>
+    <td><div class="sub-name">DM-C</div><div class="sub-role">Technical Buyer</div><div class="sub-desc">Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em></div></td>
+</tr>
+
+<!-- ══ SEG 2 CHAMPION A ══ -->
+<tr class="seg-intro" data-seg="cha"><td colspan="6">
+    <div class="si-label">Segment 2</div>
+    <div class="si-title">Champions</div>
+    <div class="si-grid">
+        <div class="si-card" style="border-left-color:#4338ca;">
+            <div class="si-card-tag" style="color:#4338ca;">Champion A · Opener</div>
+            <div class="si-card-name">C-Level CX (non-target)</div>
+            <div class="si-card-desc">Executive positioning — no demo. Turn into an internal sponsor who pushes the initiative top-down. <em>"What would make CX a board-level priority in your company this year?"</em></div>
+        </div>
+        <div class="si-card" style="border-left-color:#065f46;">
+            <div class="si-card-tag" style="color:#065f46;">Champion B · Evaluator</div>
+            <div class="si-card-name">VP / Head</div>
+            <div class="si-card-desc">High influence without direct purchase power. Demo + calculated ROI, operational use cases. Becomes an internal sponsor who validates for DM-A.</div>
+        </div>
+        <div class="si-card" style="border-left-color:#0e7490;">
+            <div class="si-card-tag" style="color:#0e7490;">Champion C · Peripheral</div>
+            <div class="si-card-name">Manager</div>
+            <div class="si-card-desc">Direct user without purchase influence. Passive nurture with practical assets and VoC-to-action playbooks. Goal: get an introduction to the DM.</div>
+        </div>
+    </div>
+</td></tr>
+<tr class="section-header"><td colspan="6">▌ SEG 2 — Champion A · Opener (C-Level · closest to DM)</td></tr>
+
+<tr class="row-cha">
+    <td class="cargo">Chief Customer Officer</td>
+    <td><span class="score c-cha">18</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="18" value="18" step="0.1" class="bar-slider" oninput="updateSlider(this)"><span class="slider-val">18.0</span></div></td>
+    <td><span class="cls c-cha">Seg 2 · Champion A</span></td>
+    <td><div class="sub-name">Champion A</div><div class="sub-role">Opener</div><div class="sub-desc">C-Level CX in a non-ABM account. Executive positioning — no demo. Turn into an internal sponsor who pushes the initiative top-down. <em>"What would make CX a board-level priority in your company this year?"</em></div></td>
+</tr>
+<tr class="row-cha">
+    <td class="cargo">Chief Experience Officer</td>
+    <td><span class="score c-cha">18</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="18" value="18" step="0.1" class="bar-slider" oninput="updateSlider(this)"><span class="slider-val">18.0</span></div></td>
+    <td><span class="cls c-cha">Seg 2 · Champion A</span></td>
+    <td><div class="sub-name">Champion A</div><div class="sub-role">Opener</div><div class="sub-desc">C-Level CX in a non-ABM account. Executive positioning — no demo. Turn into an internal sponsor who pushes the initiative top-down. <em>"What would make CX a board-level priority in your company this year?"</em></div></td>
+</tr>
+<tr class="row-cha">
+    <td class="cargo">Chief Client Officer</td>
+    <td><span class="score c-cha">18</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="18" value="18" step="0.1" class="bar-slider" oninput="updateSlider(this)"><span class="slider-val">18.0</span></div></td>
+    <td><span class="cls c-cha">Seg 2 · Champion A</span></td>
+    <td><div class="sub-name">Champion A</div><div class="sub-role">Opener</div><div class="sub-desc">C-Level CX in a non-ABM account. Executive positioning — no demo. Turn into an internal sponsor who pushes the initiative top-down. <em>"What would make CX a board-level priority in your company this year?"</em></div></td>
+</tr>
+<tr class="row-cha">
+    <td class="cargo">Chief CX Officer</td>
+    <td><span class="score c-cha">18</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="18" value="18" step="0.1" class="bar-slider" oninput="updateSlider(this)"><span class="slider-val">18.0</span></div></td>
+    <td><span class="cls c-cha">Seg 2 · Champion A</span></td>
+    <td><div class="sub-name">Champion A</div><div class="sub-role">Opener</div><div class="sub-desc">C-Level CX in a non-ABM account. Executive positioning — no demo. Turn into an internal sponsor who pushes the initiative top-down. <em>"What would make CX a board-level priority in your company this year?"</em></div></td>
+</tr>
+<tr class="row-cha">
+    <td class="cargo">Chief Customer Experience Officer</td>
+    <td><span class="score c-cha">18</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="18" value="18" step="0.1" class="bar-slider" oninput="updateSlider(this)"><span class="slider-val">18.0</span></div></td>
+    <td><span class="cls c-cha">Seg 2 · Champion A</span></td>
+    <td><div class="sub-name">Champion A</div><div class="sub-role">Opener</div><div class="sub-desc">C-Level CX in a non-ABM account. Executive positioning — no demo. Turn into an internal sponsor who pushes the initiative top-down. <em>"What would make CX a board-level priority in your company this year?"</em></div></td>
+</tr>
+
+<!-- ══ SEG 2 CHAMPION B ══ -->
+<tr class="section-header"><td colspan="6">▌ SEG 2 — Champion B · Evaluator (VP / Head · Secondary cluster)</td></tr>
+
+<tr class="row-chb">
+    <td class="cargo">VP of Customer Success</td>
+    <td><span class="score c-chb">17</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="17" value="17" step="0.1" class="bar-slider" data-color="#10b981" oninput="updateSlider(this)"><span class="slider-val">17.0</span></div></td>
+    <td><span class="cls c-chb">Seg 2 · Champion B</span></td>
+    <td><div class="sub-name">Champion B</div><div class="sub-role">Evaluator</div><div class="sub-desc">High influence without direct purchase power. Demo + calculated ROI, operational use cases. Becomes an internal sponsor who validates for DM-A.</div></td>
+</tr>
+<tr class="row-chb">
+    <td class="cargo">Head of Customer Success</td>
+    <td><span class="score c-chb">16</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="16" value="16" step="0.1" class="bar-slider" data-color="#10b981" oninput="updateSlider(this)"><span class="slider-val">16.0</span></div></td>
+    <td><span class="cls c-chb">Seg 2 · Champion B</span></td>
+    <td><div class="sub-name">Champion B</div><div class="sub-role">Evaluator</div><div class="sub-desc">High influence without direct purchase power. Demo + calculated ROI, operational use cases. Becomes an internal sponsor who validates for DM-A.</div></td>
+</tr>
+<tr class="row-chb">
+    <td class="cargo">Director of Customer Success</td>
+    <td><span class="score c-chb">11</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="11" value="11" step="0.1" class="bar-slider" data-color="#10b981" oninput="updateSlider(this)"><span class="slider-val">11.0</span></div></td>
+    <td><span class="cls c-chb">Seg 2 · Champion B</span></td>
+    <td><div class="sub-name">Champion B</div><div class="sub-role">Evaluator</div><div class="sub-desc">High influence without direct purchase power. Demo + calculated ROI, operational use cases. Becomes an internal sponsor who validates for DM-A.</div></td>
+</tr>
+
+<!-- ══ SEG 2 CHAMPION C PRIMARY ══ -->
+<tr class="section-header"><td colspan="5">▌ SEG 2 — Champion C · Peripheral (Manager, Primary)</td></tr>
+
+<tr class="row-chc">
+    <td class="cargo">Sr Manager Customer Operations</td>
+    <td><span class="score c-chc">10</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="10" value="10" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">10.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Passive nurture with practical assets and VoC-to-action playbooks. Goal: get an introduction to the DM.</div></td>
+</tr>
+<tr class="row-chc">
+    <td class="cargo">Customer Insights Manager</td>
+    <td><span class="score c-chc">10</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="10" value="10" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">10.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Passive nurture with practical assets and VoC-to-action playbooks. Goal: get an introduction to the DM.</div></td>
+</tr>
+<tr class="row-chc">
+    <td class="cargo">Customer Service Support Manager</td>
+    <td><span class="score c-chc">10</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="10" value="10" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">10.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Passive nurture with practical assets and VoC-to-action playbooks. Goal: get an introduction to the DM.</div></td>
+</tr>
+<tr class="row-chc">
+    <td class="cargo">Customer Support Operations Manager</td>
+    <td><span class="score c-chc">10</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="10" value="10" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">10.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Passive nurture with practical assets and VoC-to-action playbooks. Goal: get an introduction to the DM.</div></td>
+</tr>
+<tr class="row-chc">
+    <td class="cargo">Customer Service Manager</td>
+    <td><span class="score c-chc">10</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="10" value="10" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">10.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Passive nurture with practical assets and VoC-to-action playbooks. Goal: get an introduction to the DM.</div></td>
+</tr>
+<tr class="row-chc">
+    <td class="cargo">Customer Operations Manager</td>
+    <td><span class="score c-chc">10</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="10" value="10" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">10.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Passive nurture with practical assets and VoC-to-action playbooks. Goal: get an introduction to the DM.</div></td>
+</tr>
+<tr class="row-chc">
+    <td class="cargo">Customer Experience Manager</td>
+    <td><span class="score c-chc">10</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="10" value="10" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">10.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Passive nurture with practical assets and VoC-to-action playbooks. Goal: get an introduction to the DM.</div></td>
+</tr>
+<tr class="row-chc">
+    <td class="cargo">Customer Svc Operations Manager</td>
+    <td><span class="score c-chc">10</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="10" value="10" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">10.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Passive nurture with practical assets and VoC-to-action playbooks. Goal: get an introduction to the DM.</div></td>
+</tr>
+<tr class="row-chc">
+    <td class="cargo">Support Manager</td>
+    <td><span class="score c-chc">10</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="10" value="10" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">10.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Passive nurture with practical assets and VoC-to-action playbooks. Goal: get an introduction to the DM.</div></td>
+</tr>
+<tr class="row-chc">
+    <td class="cargo">Call Center Operations Manager</td>
+    <td><span class="score c-chc">10</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="10" value="10" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">10.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Passive nurture with practical assets and VoC-to-action playbooks. Goal: get an introduction to the DM.</div></td>
+</tr>
+<tr class="row-chc">
+    <td class="cargo">Call Center Manager</td>
+    <td><span class="score c-chc">10</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="10" value="10" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">10.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Passive nurture with practical assets and VoC-to-action playbooks. Goal: get an introduction to the DM.</div></td>
+</tr>
+
+<!-- ══ SEG 2 CHAMPION C SECONDARY ══ -->
+<tr class="section-header"><td colspan="5">▌ SEG 2 — Champion C · Peripheral (Manager, Secondary) — minimum threshold</td></tr>
+
+<tr class="row-chc">
+    <td class="cargo">Customer Success Manager</td>
+    <td><span class="score c-chc">7</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="7" value="7" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">7.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Secondary cluster. Passive nurture. Goal: get an introduction to the DM.</div></td>
+</tr>
+<tr class="row-chc">
+    <td class="cargo">Manager of Customer Success</td>
+    <td><span class="score c-chc">7</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="7" value="7" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">7.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Secondary cluster. Passive nurture. Goal: get an introduction to the DM.</div></td>
+</tr>
+<tr class="row-chc">
+    <td class="cargo">Account Services Manager</td>
+    <td><span class="score c-chc">7</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="7" value="7" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">7.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Secondary cluster. Passive nurture. Goal: get an introduction to the DM.</div></td>
+</tr>
+<tr class="row-chc">
+    <td class="cargo">Account Service Delivery Manager</td>
+    <td><span class="score c-chc">7</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="7" value="7" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">7.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Secondary cluster. Passive nurture. Goal: get an introduction to the DM.</div></td>
+</tr>
+<tr class="row-chc">
+    <td class="cargo">Professional Services Account Manager</td>
+    <td><span class="score c-chc">7</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="7" value="7" step="0.1" class="bar-slider" data-color="#06b6d4" oninput="updateSlider(this)"><span class="slider-val">7.0</span></div></td>
+    <td><span class="cls c-chc">Seg 2 · Champion C</span></td>
+    <td><div class="sub-name">Champion C</div><div class="sub-role">Peripheral</div><div class="sub-desc">Direct user without purchase influence. Secondary cluster. Passive nurture. Goal: get an introduction to the DM.</div></td>
+</tr>
+
+<!-- ══ OUT — BELOW MGR PRIMARY ══ -->
+<tr class="seg-intro" data-seg="out-below-hi"><td colspan="6">
+    <div class="si-label">Outside Ruleset</div>
+    <div class="si-title">Excluded Profiles</div>
+    <div class="si-grid">
+        <div class="si-card" style="border-left-color:#78350f;">
+            <div class="si-card-tag" style="color:#78350f;">Out-A · Below Manager Primary</div>
+            <div class="si-card-name">No Classification</div>
+            <div class="si-card-desc">Does not meet minimum seniority (Manager). No influence or purchase power. Remove from campaign.</div>
+        </div>
+        <div class="si-card" style="border-left-color:#78350f;">
+            <div class="si-card-tag" style="color:#78350f;">Out-B · Below Manager Secondary</div>
+            <div class="si-card-name">No Classification</div>
+            <div class="si-card-desc">Secondary cluster. No relevant influence in the buying process. Below minimum threshold. Remove from campaign.</div>
+        </div>
+        <div class="si-card" style="border-left-color:#9ca3af;">
+            <div class="si-card-tag" style="color:#374151;">Out-C · Peripheral</div>
+            <div class="si-card-name">No Classification</div>
+            <div class="si-card-desc">No functional role in the buying process. Unrelated function or seniority too low. Remove from all segments.</div>
+        </div>
+    </div>
+</td></tr>
+<tr class="section-header"><td colspan="5">⚠ OUT-A — Below Manager · Primary</td></tr>
+
+<tr class="row-fora-b">
+    <td class="cargo">Customer Service Team Lead</td>
+    <td><span class="score c-fora-b">5</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="5" value="5" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-A</span></td>
+    <td><div class="sub-name">Out-A</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority (Manager). No influence or purchase power. Remove from campaign.</div></td>
+</tr>
+<tr class="row-fora-b">
+    <td class="cargo">Customer Support Specialist</td>
+    <td><span class="score c-fora-b">5</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="5" value="5" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-A</span></td>
+    <td><div class="sub-name">Out-A</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority (Manager). No influence or purchase power. Remove from campaign.</div></td>
+</tr>
+<tr class="row-fora-b">
+    <td class="cargo">Resolution Specialist</td>
+    <td><span class="score c-fora-b">5</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="5" value="5" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-A</span></td>
+    <td><div class="sub-name">Out-A</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority (Manager). No influence or purchase power. Remove from campaign.</div></td>
+</tr>
+<tr class="row-fora-b">
+    <td class="cargo">Call Center Supervisor</td>
+    <td><span class="score c-fora-b">5</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="5" value="5" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-A</span></td>
+    <td><div class="sub-name">Out-A</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority (Manager). No influence or purchase power. Remove from campaign.</div></td>
+</tr>
+<tr class="row-fora-b">
+    <td class="cargo">Customer Care Supervisor</td>
+    <td><span class="score c-fora-b">5</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="5" value="5" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-A</span></td>
+    <td><div class="sub-name">Out-A</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority (Manager). No influence or purchase power. Remove from campaign.</div></td>
+</tr>
+<tr class="row-fora-b">
+    <td class="cargo">Customer Service Supervisor</td>
+    <td><span class="score c-fora-b">5</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="5" value="5" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-A</span></td>
+    <td><div class="sub-name">Out-A</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority (Manager). No influence or purchase power. Remove from campaign.</div></td>
+</tr>
+<tr class="row-fora-b">
+    <td class="cargo">Customer Support Supervisor</td>
+    <td><span class="score c-fora-b">5</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="5" value="5" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-A</span></td>
+    <td><div class="sub-name">Out-A</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority (Manager). No influence or purchase power. Remove from campaign.</div></td>
+</tr>
+<tr class="row-fora-b">
+    <td class="cargo">Operations Supervisor</td>
+    <td><span class="score c-fora-b">5</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="5" value="5" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-A</span></td>
+    <td><div class="sub-name">Out-A</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority (Manager). No influence or purchase power. Remove from campaign.</div></td>
+</tr>
+<tr class="row-fora-b">
+    <td class="cargo">Support Associate</td>
+    <td><span class="score c-fora-b">5</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="5" value="5" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-A</span></td>
+    <td><div class="sub-name">Out-A</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority (Manager). No influence or purchase power. Remove from campaign.</div></td>
+</tr>
+<tr class="row-fora-b">
+    <td class="cargo">Customer Service Officer</td>
+    <td><span class="score c-fora-b">5</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="5" value="5" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-A</span></td>
+    <td><div class="sub-name">Out-A</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority (Manager). No influence or purchase power. Remove from campaign.</div></td>
+</tr>
+
+<!-- ══ OUT — BELOW MGR SECONDARY ══ -->
+<tr class="section-header"><td colspan="5">⚠ OUT-B — Below Manager · Secondary</td></tr>
+
+<tr class="row-fora-b">
+    <td class="cargo">Technical Support Specialist</td>
+    <td><span class="score c-fora-b">2</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="2" value="2" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-B</span></td>
+    <td><div class="sub-name">Out-B</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority. Secondary cluster with no relevant influence in the buying process. Remove from campaign.</div></td>
+</tr>
+<tr class="row-fora-b">
+    <td class="cargo">Technical Support Engineer</td>
+    <td><span class="score c-fora-b">2</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="2" value="2" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-B</span></td>
+    <td><div class="sub-name">Out-B</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority. Secondary cluster with no relevant influence in the buying process. Remove from campaign.</div></td>
+</tr>
+<tr class="row-fora-b">
+    <td class="cargo">Customer Success Lead</td>
+    <td><span class="score c-fora-b">2</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="2" value="2" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-B</span></td>
+    <td><div class="sub-name">Out-B</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority. Secondary cluster with no relevant influence in the buying process. Remove from campaign.</div></td>
+</tr>
+<tr class="row-fora-b">
+    <td class="cargo">Customer Success Analyst</td>
+    <td><span class="score c-fora-b">2</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="2" value="2" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-B</span></td>
+    <td><div class="sub-name">Out-B</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority. Secondary cluster with no relevant influence in the buying process. Remove from campaign.</div></td>
+</tr>
+<tr class="row-fora-b">
+    <td class="cargo">Customer Success Consultant</td>
+    <td><span class="score c-fora-b">2</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="2" value="2" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-B</span></td>
+    <td><div class="sub-name">Out-B</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority. Secondary cluster with no relevant influence in the buying process. Remove from campaign.</div></td>
+</tr>
+<tr class="row-fora-b">
+    <td class="cargo">Customer Success Executive</td>
+    <td><span class="score c-fora-b">2</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="2" value="2" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-B</span></td>
+    <td><div class="sub-name">Out-B</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority. Secondary cluster with no relevant influence in the buying process. Remove from campaign.</div></td>
+</tr>
+<tr class="row-fora-b">
+    <td class="cargo">Customer Specialist</td>
+    <td><span class="score c-fora-b">2</span></td>
+    <td><div class="slider-wrap"><input type="range" min="0" max="2" value="2" step="0.1" class="bar-slider" data-color="#fbbf24" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div></td>
+    <td><span class="cls c-fora-b">⚠ Out-B</span></td>
+    <td><div class="sub-name">Out-B</div><div class="sub-role">No Classification</div><div class="sub-desc">Does not meet minimum seniority. Secondary cluster with no relevant influence in the buying process. Remove from campaign.</div></td>
+</tr>
+
+<!-- ══ OUT — PERIPHERAL ══ -->
+<tr class="section-header"><td colspan="5">⚠ OUT-C — Peripheral / Irrelevant Cluster</td></tr>
+
+<tr class="row-fora-p">
+    <td class="cargo">Sales Specialist · Sales Supervisor</td>
+    <td class="score-na">—</td>
+    <td><div class="bar-wrap"><div class="bar bar-fora-p" style="width:0%"></div></div></td>
+    <td><span class="cls c-fora-p">⚠ Out-C</span></td>
+    <td><div class="sub-name">Out-C</div><div class="sub-role">No Classification</div><div class="sub-desc">Cluster outside ICP. No connection to CX, Support or Ops. Score 0 regardless of any other criteria.</div></td>
+</tr>
+<tr class="row-fora-p">
+    <td class="cargo">Account Mgr · Tech Account Manager</td>
+    <td class="score-na">—</td>
+    <td><div class="bar-wrap"><div class="bar bar-fora-p" style="width:0%"></div></div></td>
+    <td><span class="cls c-fora-p">⚠ Out-C</span></td>
+    <td><div class="sub-name">Out-C</div><div class="sub-role">No Classification</div><div class="sub-desc">Cluster outside ICP. No connection to CX, Support or Ops. Score 0 regardless of any other criteria.</div></td>
+</tr>
+<tr class="row-fora-p">
+    <td class="cargo">Employee Relations (all)</td>
+    <td class="score-na">—</td>
+    <td><div class="bar-wrap"><div class="bar bar-fora-p" style="width:0%"></div></div></td>
+    <td><span class="cls c-fora-p">⚠ Out-C</span></td>
+    <td><div class="sub-name">Out-C</div><div class="sub-role">No Classification</div><div class="sub-desc">Cluster outside ICP. No connection to CX, Support or Ops. Score 0 regardless of any other criteria.</div></td>
+</tr>
+<tr class="row-fora-p">
+    <td class="cargo">Store · Retail · Counter Manager</td>
+    <td class="score-na">—</td>
+    <td><div class="bar-wrap"><div class="bar bar-fora-p" style="width:0%"></div></div></td>
+    <td><span class="cls c-fora-p">⚠ Out-C</span></td>
+    <td><div class="sub-name">Out-C</div><div class="sub-role">No Classification</div><div class="sub-desc">Cluster outside ICP. No connection to CX, Support or Ops. Score 0 regardless of any other criteria.</div></td>
+</tr>
+<tr class="row-fora-p">
+    <td class="cargo">Admin · Personal · Executive Asst</td>
+    <td class="score-na">—</td>
+    <td><div class="bar-wrap"><div class="bar bar-fora-p" style="width:0%"></div></div></td>
+    <td><span class="cls c-fora-p">⚠ Out-C</span></td>
+    <td><div class="sub-name">Out-C</div><div class="sub-role">No Classification</div><div class="sub-desc">Cluster outside ICP. No connection to CX, Support or Ops. Score 0 regardless of any other criteria.</div></td>
+</tr>
+<tr class="row-fora-p">
+    <td class="cargo">Intern · Success Coach · Superintendent</td>
+    <td class="score-na">—</td>
+    <td><div class="bar-wrap"><div class="bar bar-fora-p" style="width:0%"></div></div></td>
+    <td><span class="cls c-fora-p">⚠ Out-C</span></td>
+    <td><div class="sub-name">Out-C</div><div class="sub-role">No Classification</div><div class="sub-desc">Cluster outside ICP. No connection to CX, Support or Ops. Score 0 regardless of any other criteria.</div></td>
+</tr>
+<tr class="row-fora-p">
+    <td class="cargo">Digital Specialist · Law Specialist</td>
+    <td class="score-na">—</td>
+    <td><div class="bar-wrap"><div class="bar bar-fora-p" style="width:0%"></div></div></td>
+    <td><span class="cls c-fora-p">⚠ Out-C</span></td>
+    <td><div class="sub-name">Out-C</div><div class="sub-role">No Classification</div><div class="sub-desc">Cluster outside ICP. No connection to CX, Support or Ops. Score 0 regardless of any other criteria.</div></td>
+</tr>
+<tr class="row-fora-p">
+    <td class="cargo">Maintenance · Production Supervisor</td>
+    <td class="score-na">—</td>
+    <td><div class="bar-wrap"><div class="bar bar-fora-p" style="width:0%"></div></div></td>
+    <td><span class="cls c-fora-p">⚠ Out-C</span></td>
+    <td><div class="sub-name">Out-C</div><div class="sub-role">No Classification</div><div class="sub-desc">Cluster outside ICP. No connection to CX, Support or Ops. Score 0 regardless of any other criteria.</div></td>
+</tr>
+
+</tbody>
+</table>
+</div>
+
+<div class="action-bar" style="margin-top:20px; margin-bottom:0;">
+    <button class="btn btn-reset" onclick="resetAll()">↺ Reset All</button>
+    <button class="btn btn-add"   onclick="showAddModal()">+ Add Title</button>
+    <button class="btn btn-save"  onclick="saveConfig()">→ View Results</button>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#1e3a8a"></div> Seg 0 · Exec (ABM)</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#991b1b"></div> Seg 1 · DM-A Strategic Buyer</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#c2410c"></div> Seg 1 · DM-B Operational Buyer</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#92400e"></div> Seg 1 · DM-C Technical Buyer</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#4338ca"></div> Seg 2 · Champion A Opener</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#065f46"></div> Seg 2 · Champion B Evaluator</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#0e7490"></div> Seg 2 · Champion C Peripheral</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#78350f"></div> ⚠ Outside · Below Manager</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#374151"></div> ✗ Outside · Peripheral Cluster</div>
+</div>
+<!-- ── Add-Title Modal ── -->
+<div class="modal-overlay" id="add-modal">
+    <div class="modal">
+        <h2>Add Job Title</h2>
+        <p class="modal-sub">The new title will be inserted at the end of the selected segment. You can drag it to reposition.</p>
+        <label>Job Title</label>
+        <input type="text" id="new-title" placeholder="e.g. Head of CX Operations" autocomplete="off">
+        <label>Segment</label>
+        <select id="new-seg">
+            <option value="dm1">Seg 1 · DM-A — Strategic Buyer · C-Level / VP (D1: 35–40)</option>
+            <option value="dm2">Seg 1 · DM-B — Operational Buyer · VP (D1: 35)</option>
+            <option value="dm3-head">Seg 1 · DM-C — Technical Buyer · Head (D1: 28)</option>
+            <option value="dm3-dir">Seg 1 · DM-C — Technical Buyer · Director (D1: 20)</option>
+            <option value="cha">Seg 2 · Champion A — Opener · C-Level non-target (D1: 18)</option>
+            <option value="chb">Seg 2 · Champion B — Evaluator · VP / Head (D1: 16)</option>
+            <option value="chc-pri">Seg 2 · Champion C — Peripheral · Manager Primary (D1: 10)</option>
+            <option value="chc-sec">Seg 2 · Champion C — Peripheral · Manager Secondary (D1: 7)</option>
+            <option value="out-below-hi">Out-A — Below Manager · Primary (D1: 5)</option>
+            <option value="out-below-lo">Out-B — Below Manager · Secondary (D1: 2)</option>
+            <option value="out-periph">Out-C — Peripheral / Irrelevant Cluster (D1: 0)</option>
+        </select>
+        <label>D1 Score <span style="font-weight:400;text-transform:none;letter-spacing:0">(auto-fills; adjust if needed)</span></label>
+        <input type="number" id="new-d1" min="0" max="40" step="0.1" value="40">
+        <div class="modal-actions">
+            <button class="btn btn-reset" onclick="closeAddModal()">Cancel</button>
+            <button class="btn btn-save" onclick="confirmAddTitle()">Add Title</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast">✓ Configuration saved as CSV</div>
+
+<script>
+// ── Segment configuration ─────────────────────────────────────────────────
+const SEG_CONFIG = {
+    'dm1':          { row:'row-dm1',    cls:'c-dm1',    clsTxt:'Seg 1 · DM-A',      color:'#ef4444', d1:35, disabled:false, subLabel:'DM-A',       subName:'Strategic Buyer',   subDesc:'Opens the budget but needs DM-C to validate. Focus on NPS, churn and strategic decision-making. No demo. <em>"What will your board ask about CX in 2026?"</em>' },
+    'dm2':          { row:'row-dm2',    cls:'c-dm2',    clsTxt:'Seg 1 · DM-B',      color:'#f97316', d1:35, disabled:false, subLabel:'DM-B',       subName:'Operational Buyer', subDesc:'Has urgency and can create a bottom-up project. Focus on cost per contact, deflection and QA. <em>"How much do you spend per ticket today?"</em>' },
+    'dm3-head':     { row:'row-dm3',    cls:'c-dm3',    clsTxt:'Seg 1 · DM-C',      color:'#f59e0b', d1:28, disabled:false, subLabel:'DM-C',       subName:'Technical Buyer',   subDesc:'Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em>' },
+    'dm3-dir':      { row:'row-dm3',    cls:'c-dm3',    clsTxt:'Seg 1 · DM-C',      color:'#f59e0b', d1:20, disabled:false, subLabel:'DM-C',       subName:'Technical Buyer',   subDesc:'Conducts technical evaluation. Can block or accelerate the deal. Demo focused on integrations and insights workflow. <em>"How do you close the loop between feedback and action today?"</em>' },
+    'cha':          { row:'row-cha',    cls:'c-cha',    clsTxt:'Seg 2 · Champion A', color:'#4338ca', d1:18, disabled:false, subLabel:'Champion A', subName:'Opener',            subDesc:'C-Level CX in a non-ABM account. Executive positioning — no demo. Turn into an internal sponsor who pushes the initiative top-down. <em>"What would make CX a board-level priority in your company this year?"</em>' },
+    'chb':          { row:'row-chb',    cls:'c-chb',    clsTxt:'Seg 2 · Champion B', color:'#10b981', d1:16, disabled:false, subLabel:'Champion B', subName:'Evaluator',         subDesc:'High influence without direct purchase power. Demo + calculated ROI, operational use cases. Becomes an internal sponsor who validates for DM-A.' },
+    'chc-pri':      { row:'row-chc',    cls:'c-chc',    clsTxt:'Seg 2 · Champion C', color:'#06b6d4', d1:10, disabled:false, subLabel:'Champion C', subName:'Peripheral',        subDesc:'Direct user without purchase influence. Passive nurture with practical assets and VoC-to-action playbooks. Goal: get an introduction to the DM.' },
+    'chc-sec':      { row:'row-chc',    cls:'c-chc',    clsTxt:'Seg 2 · Champion C', color:'#06b6d4', d1:7,  disabled:false, subLabel:'Champion C', subName:'Peripheral',        subDesc:'Direct user without purchase influence. Secondary cluster. Passive nurture. Goal: get an introduction to the DM.' },
+    'out-below-hi': { row:'row-fora-b', cls:'c-fora-b', clsTxt:'⚠ Out-A',           color:'#fbbf24', d1:5,  disabled:true,  subLabel:'Out-A',      subName:'No Classification', subDesc:'Does not meet minimum seniority (Manager). No influence or purchase power. Remove from campaign.' },
+    'out-below-lo': { row:'row-fora-b', cls:'c-fora-b', clsTxt:'⚠ Out-B',           color:'#fbbf24', d1:2,  disabled:true,  subLabel:'Out-B',      subName:'No Classification', subDesc:'Does not meet minimum seniority. Secondary cluster with no relevant influence in the buying process. Remove from campaign.' },
+    'out-periph':   { row:'row-fora-p', cls:'c-fora-p', clsTxt:'⚠ Out-C',           color:'#9ca3af', d1:0,  disabled:true,  subLabel:'Out-C',      subName:'No Classification', subDesc:'Cluster outside ICP. No connection to CX, Support or Ops. Score 0 regardless of any other criteria.' }
+};
+
+const SECTION_SEGS   = ['dm1','dm2','dm3-head','dm3-dir','cha','chb','chc-pri','chc-sec','out-below-hi','out-below-lo','out-periph'];
+const ALL_ROW_CLASSES = ['row-dm1','row-dm2','row-dm3','row-cha','row-chb','row-chc','row-fora-b','row-fora-p'];
+
+// ── Slider helpers ────────────────────────────────────────────────────────
+const SLIDER_ACTIVE   = '#1f2937';   // uniform dark for all active sliders
+const SLIDER_DISABLED = '#d1d5db';   // uniform light for all disabled sliders
+const SLIDER_TRACK    = '#f3f4f6';   // unfilled track
+
+function updateSlider(input) {
+    const min = parseFloat(input.min);
+    const max = parseFloat(input.max);
+    const val = parseFloat(input.value);
+    const pct = max > 0 ? ((val - min) / (max - min)) * 100 : 0;
+    input.style.background = `linear-gradient(to right, ${SLIDER_ACTIVE} ${pct}%, ${SLIDER_TRACK} ${pct}%)`;
+    input.style.setProperty('--thumb-color', SLIDER_ACTIVE);
+    const display = input.parentElement.querySelector('.slider-val');
+    if (display) display.textContent = val.toFixed(1);
+}
+
+function initSlider(s) {
+    if (!s.disabled) {
+        updateSlider(s);
+    } else {
+        s.style.background = `linear-gradient(to right, ${SLIDER_DISABLED} 100%, ${SLIDER_TRACK} 100%)`;
+        s.style.setProperty('--thumb-color', SLIDER_DISABLED);
+    }
+}
+
+function resetAll() {
+    document.querySelectorAll('.bar-slider:not(:disabled)').forEach(s => {
+        s.value = s.max;
+        updateSlider(s);
+    });
+}
+
+// ── Undo stack ────────────────────────────────────────────────────────────
+const undoStack = [];
+const MAX_UNDO  = 30;
+
+function saveUndoSnapshot() {
+    // Sync slider current values → HTML attributes before capturing innerHTML
+    // (innerHTML serialises attributes, not JS properties)
+    document.querySelectorAll('.bar-slider').forEach(s => {
+        s.setAttribute('value', s.value);
+    });
+    undoStack.push(document.querySelector('tbody').innerHTML);
+    if (undoStack.length > MAX_UNDO) undoStack.shift();
+}
+
+function undo() {
+    if (undoStack.length === 0) { showToast('Nothing to undo'); return; }
+    document.querySelector('tbody').innerHTML = undoStack.pop();
+    initTable();
+    showToast('↩ Undone  (' + undoStack.length + ' left)');
+}
+
+// ── Toast (dynamic message) ────────────────────────────────────────────────
+let toastTimer = null;
+function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+}
+
+// ── Delete ────────────────────────────────────────────────────────────────
+function deleteRow(btn) {
+    saveUndoSnapshot();
+    btn.closest('tr').remove();
+}
+
+// ── Drag & Drop ───────────────────────────────────────────────────────────
+let draggedRow = null;
+
+function setupDragSource(row) {
+    // Row starts NOT draggable — only the handle activates it
+    row.draggable = false;
+
+    // Inject handle into first cell (only once)
+    const firstCell = row.querySelector('td:first-child');
+    if (firstCell && !firstCell.querySelector('.drag-handle')) {
+        const handle = document.createElement('span');
+        handle.className = 'drag-handle';
+        handle.title = 'Drag to reorder';
+        handle.textContent = '⠿';
+        handle.addEventListener('mousedown', () => { row.draggable = true; });
+        firstCell.prepend(handle);
+    }
+
+    row.addEventListener('dragstart', e => {
+        if (!row.draggable) { e.preventDefault(); return; }
+        saveUndoSnapshot();                              // ← snapshot BEFORE any visual change
+        draggedRow = row;
+        setTimeout(() => row.classList.add('dragging'), 0);
+        e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', () => {
+        row.draggable = false;
+        row.classList.remove('dragging');
+        document.querySelectorAll('.drag-over').forEach(r => r.classList.remove('drag-over'));
+        draggedRow = null;
+    });
+}
+
+function setupDropTarget(row) {
+    row.addEventListener('dragover', e => {
+        if (!draggedRow || draggedRow === row) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        document.querySelectorAll('.drag-over').forEach(r => r.classList.remove('drag-over'));
+        row.classList.add('drag-over');
+    });
+    row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+    row.addEventListener('drop', e => {
+        e.preventDefault();
+        if (!draggedRow || draggedRow === row) return;
+        row.classList.remove('drag-over');
+
+        if (row.classList.contains('section-header')) {
+            // Drop on header → move to end of that section
+            const targetSeg = row.dataset.seg;
+            let insertAfter = row;
+            let next = row.nextElementSibling;
+            while (next && !next.classList.contains('section-header')) {
+                insertAfter = next;
+                next = next.nextElementSibling;
+            }
+            insertAfter.after(draggedRow);
+            applySegment(draggedRow, targetSeg);
+        } else {
+            // Drop on data row → insert before it
+            row.parentNode.insertBefore(draggedRow, row);
+            applySegment(draggedRow, row.dataset.seg);
+        }
+    });
+}
+
+// ── Apply segment styling to a moved/new row ─────────────────────────────
+function applySegment(row, segKey) {
+    const cfg = SEG_CONFIG[segKey];
+    if (!cfg) return;
+
+    row.classList.remove(...ALL_ROW_CLASSES);
+    row.classList.add(cfg.row);
+    row.dataset.seg = segKey;
+
+    const scoreCell  = row.querySelector('.score-cell');
+    const sliderCell = row.querySelector('.slider-cell');
+    const clsCell    = row.querySelector('.cls-cell');
+    const subCell    = row.querySelector('.sub-cell');
+
+    if (scoreCell) {
+        scoreCell.innerHTML = (segKey === 'out-periph')
+            ? '<span class="score-na">—</span>'
+            : `<span class="score ${cfg.cls}">${cfg.d1}</span>`;
+    }
+
+    if (sliderCell) {
+        if (segKey === 'out-periph') {
+            sliderCell.innerHTML = '<div class="bar-wrap"><div class="bar bar-fora-p" style="width:0%"></div></div>';
+        } else if (cfg.disabled) {
+            sliderCell.innerHTML = `<div class="slider-wrap"><input type="range" min="0" max="${cfg.d1}" value="${cfg.d1}" step="0.1" class="bar-slider" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div>`;
+            initSlider(sliderCell.querySelector('.bar-slider'));
+        } else {
+            sliderCell.innerHTML = `<div class="slider-wrap"><input type="range" min="0" max="${cfg.d1}" value="${cfg.d1}" step="0.1" class="bar-slider" oninput="updateSlider(this)"><span class="slider-val">${cfg.d1}.0</span></div>`;
+            initSlider(sliderCell.querySelector('.bar-slider'));
+        }
+    }
+
+    if (clsCell) clsCell.innerHTML = `<span class="cls ${cfg.cls}">${cfg.clsTxt}</span>`;
+    if (subCell) subCell.innerHTML  = `<div class="sub-name">${cfg.subLabel}</div><div class="sub-role">${cfg.subName}</div><div class="sub-desc">${cfg.subDesc}</div>`;
+}
+
+// ── Add Title modal ───────────────────────────────────────────────────────
+function showAddModal() {
+    document.getElementById('add-modal').classList.add('open');
+    const ti = document.getElementById('new-title');
+    ti.value = '';
+    ti.focus();
+}
+function closeAddModal() {
+    document.getElementById('add-modal').classList.remove('open');
+}
+
+function confirmAddTitle() {
+    const title  = document.getElementById('new-title').value.trim();
+    const segKey = document.getElementById('new-seg').value;
+    const d1     = parseFloat(document.getElementById('new-d1').value) || 0;
+    if (!title) { document.getElementById('new-title').focus(); return; }
+    saveUndoSnapshot();
+
+    const cfg = SEG_CONFIG[segKey];
+    if (!cfg) return;
+
+    // Build row HTML
+    let weightHtml;
+    if (segKey === 'out-periph') {
+        weightHtml = '<div class="bar-wrap"><div class="bar bar-fora-p" style="width:0%"></div></div>';
+    } else if (cfg.disabled) {
+        weightHtml = `<div class="slider-wrap"><input type="range" min="0" max="${d1}" value="${d1}" step="0.1" class="bar-slider" oninput="updateSlider(this)" disabled><span class="slider-val">—</span></div>`;
+    } else {
+        weightHtml = `<div class="slider-wrap"><input type="range" min="0" max="${d1}" value="${d1}" step="0.1" class="bar-slider" oninput="updateSlider(this)"><span class="slider-val">${d1.toFixed(1)}</span></div>`;
+    }
+    const scoreHtml = (segKey === 'out-periph') ? '<span class="score-na">—</span>' : `<span class="score ${cfg.cls}">${d1}</span>`;
+
+    const tr = document.createElement('tr');
+    tr.className = cfg.row;
+    tr.dataset.seg = segKey;
+    tr.draggable = true;
+    tr.innerHTML = `
+        <td class="cargo-cell"><span class="cargo">${title}</span></td>
+        <td class="score-cell">${scoreHtml}</td>
+        <td class="slider-cell">${weightHtml}</td>
+        <td class="cls-cell"><span class="cls ${cfg.cls}">${cfg.clsTxt}</span></td>
+        <td class="sub-cell"><div class="sub-name">${cfg.subLabel}</div><div class="sub-role">${cfg.subName}</div><div class="sub-desc">${cfg.subDesc}</div></td>
+        <td class="action-cell"><button class="btn-del" onclick="deleteRow(this)" title="Remove">×</button></td>
+    `;
+
+    // Find section header and insert at end of that section
+    let targetHeader = null;
+    document.querySelectorAll('tr.section-header').forEach(h => {
+        if (h.dataset.seg === segKey) targetHeader = h;
+    });
+
+    if (targetHeader) {
+        let insertAfter = targetHeader;
+        let next = targetHeader.nextElementSibling;
+        while (next && !next.classList.contains('section-header')) {
+            insertAfter = next;
+            next = next.nextElementSibling;
+        }
+        insertAfter.after(tr);
+    } else {
+        document.querySelector('tbody').appendChild(tr);
+    }
+
+    setupDragSource(tr);
+    setupDropTarget(tr);
+    const s = tr.querySelector('.bar-slider');
+    if (s) initSlider(s);
+
+    closeAddModal();
+}
+
+// ── Save → open results tab ───────────────────────────────────────────────
+function saveConfig() {
+    const rows = [];
+    let sectionLabel = '';
+
+    document.querySelectorAll('tbody tr').forEach(row => {
+        if (row.classList.contains('section-header')) {
+            sectionLabel = row.querySelector('td').textContent.trim();
+        } else {
+            const cargo   = row.querySelector('.cargo');
+            const score   = row.querySelector('.score');
+            const slider  = row.querySelector('.bar-slider:not(:disabled)');
+            const cls     = row.querySelector('.cls');
+            const subName = row.querySelector('.sub-name');
+            if (!cargo) return;
+
+            rows.push({
+                section : sectionLabel,
+                title   : cargo.textContent.trim(),
+                d1      : score  ? score.textContent.trim() : '—',
+                weight  : slider ? parseFloat(slider.value).toFixed(1) : '—',
+                cls     : cls     ? cls.textContent.trim()     : '—',
+                subName : subName ? subName.textContent.trim() : '—',
+                seg     : row.dataset.seg || ''
+            });
+        }
+    });
+
+    // Segment accent colours for results page
+    const SEG_ACCENT = {
+        'seg0':'#1e3a8a','dm1':'#991b1b','dm2':'#c2410c',
+        'dm3-head':'#92400e','dm3-dir':'#92400e',
+        'cha':'#4338ca','chb':'#065f46','chc-pri':'#0e7490','chc-sec':'#0e7490',
+        'out-below-hi':'#78350f','out-below-lo':'#78350f','out-periph':'#374151'
+    };
+
+    let tableRows = '';
+    let lastSection = '';
+    rows.forEach(r => {
+        if (r.section !== lastSection) {
+            lastSection = r.section;
+            tableRows += `<tr class="sec-hdr"><td colspan="5">${r.section}</td></tr>`;
+        }
+        const accent = SEG_ACCENT[r.seg] || '#374151';
+        tableRows += `<tr style="border-left:4px solid ${accent}; border-bottom:1px solid #f1f5f9">
+            <td style="padding:10px 16px;font-size:13px;font-weight:500">${r.title}</td>
+            <td style="padding:10px 16px;font-size:13px;text-align:center">${r.d1}</td>
+            <td style="padding:10px 16px;font-size:14px;font-weight:700;text-align:center">${r.weight}</td>
+            <td style="padding:10px 16px;font-size:12px">${r.cls}</td>
+            <td style="padding:10px 16px;font-size:12px;color:#64748b">${r.subName}</td>
+        </tr>`;
+    });
+
+    const jsonData = JSON.stringify(rows).replace(/<\/script>/g, '<\\/script>');
+    const ts = new Date().toLocaleString();
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Birdie.ai — Classification Results</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f4f8;color:#1e293b;padding:40px 32px}
+.header{background:#0f172a;color:#fff;padding:28px 36px;border-radius:14px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.header h1{font-size:22px;font-weight:700}
+.header p{font-size:12px;color:#94a3b8;margin-top:6px}
+.btn-csv{background:#1e3a8a;color:#fff;border:none;padding:11px 24px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;transition:opacity .15s}
+.btn-csv:hover{opacity:.88}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+thead tr{background:#0f172a}
+thead th{padding:13px 16px;text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#cbd5e1}
+thead th:nth-child(2),thead th:nth-child(3){text-align:center}
+tr.sec-hdr td{background:#f1f5f9;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:#64748b;padding:8px 16px;border-bottom:2px solid #e2e8f0}
+.footer{font-size:12px;color:#94a3b8;margin-top:16px;text-align:right}
+</style>
+</head>
+<body>
+<div class="header">
+  <div>
+    <h1>Birdie.ai — Classification Results</h1>
+    <p>Lead Classification Ruleset v2.1 &nbsp;·&nbsp; ${ts}</p>
+  </div>
+  <button class="btn-csv" onclick="downloadCSV()">↓ Download CSV</button>
+</div>
+<table>
+<thead>
+  <tr>
+    <th style="width:22%">Job Title</th>
+    <th style="width:7%">D1 Score</th>
+    <th style="width:10%">Custom Weight</th>
+    <th style="width:18%">Classification</th>
+    <th>Sub-classification</th>
+  </tr>
+</thead>
+<tbody>${tableRows}</tbody>
+</table>
+<p class="footer">Exported on ${ts} &nbsp;·&nbsp; ${rows.length} titles</p>
+<script>
+const DATA = ${jsonData};
+function downloadCSV() {
+  let csv = 'Job Title,Classification,Sub-classification,D1 Ruleset Score,Custom Weight\\n';
+  DATA.forEach(r => {
+    csv += '"'+r.title+'","'+r.cls+'","'+r.subName+'","'+r.d1+'","'+r.weight+'"\\n';
+  });
+  const blob = new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href=url; a.download='birdie_classification_weights.csv';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+<\/script>
+</body>
+</html>`;
+
+    const tab = window.open('', '_blank');
+    if (tab) { tab.document.write(html); tab.document.close(); }
+}
+
+// ── initTable — runs on load AND after every undo ─────────────────────────
+function initTable() {
+    // 0. Clear any leftover drag state from the restored snapshot
+    document.querySelectorAll('.dragging, .drag-over').forEach(el => {
+        el.classList.remove('dragging', 'drag-over');
+    });
+    draggedRow = null;
+
+    // 1. Assign data-seg to section headers
+    document.querySelectorAll('tr.section-header').forEach((hdr, i) => {
+        hdr.dataset.seg = SECTION_SEGS[i] || 'out-periph';
+        setupDropTarget(hdr);
+    });
+
+    // 2. Walk rows: tag cells, add delete button, setup drag/drop
+    let currentSeg = 'seg0';
+    document.querySelectorAll('tbody tr').forEach(row => {
+        if (row.classList.contains('section-header')) {
+            currentSeg = row.dataset.seg;
+        } else if (row.classList.contains('seg-intro')) {
+            // index/intro rows — skip entirely
+        } else {
+            row.dataset.seg = currentSeg;
+
+            // Tag cells for applySegment (skip if already tagged)
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 5 && !cells[0].classList.contains('cargo-cell')) {
+                cells[0].classList.add('cargo-cell');
+                cells[1].classList.add('score-cell');
+                cells[2].classList.add('slider-cell');
+                cells[3].classList.add('cls-cell');
+                cells[4].classList.add('sub-cell');
+            }
+
+            // Delete button (only if not already present)
+            if (!row.querySelector('.action-cell')) {
+                const td = document.createElement('td');
+                td.className = 'action-cell';
+                td.innerHTML = '<button class="btn-del" onclick="deleteRow(this)" title="Remove">×</button>';
+                row.appendChild(td);
+            }
+
+            setupDragSource(row);
+            setupDropTarget(row);
+        }
+    });
+
+    // 3. Init sliders
+    document.querySelectorAll('.bar-slider').forEach(initSlider);
+}
+
+// ── Init on load ──────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+    initTable();
+
+    // Modal: auto-fill D1 when segment changes
+    document.getElementById('new-seg').addEventListener('change', function () {
+        const cfg = SEG_CONFIG[this.value];
+        if (cfg) document.getElementById('new-d1').value = cfg.d1;
+    });
+
+    // Close modal on overlay click
+    document.getElementById('add-modal').addEventListener('click', function (e) {
+        if (e.target === this) closeAddModal();
+    });
+
+    // Enter / Escape in modal title field
+    document.getElementById('new-title').addEventListener('keydown', e => {
+        if (e.key === 'Enter')  confirmAddTitle();
+        if (e.key === 'Escape') closeAddModal();
+    });
+
+    // Ctrl+Z / Cmd+Z — undo (skip when focus is inside an input)
+    document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+            const tag = document.activeElement.tagName;
+            if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+            e.preventDefault();
+            undo();
+        }
+    });
+
+    // Undo snapshot before any slider interaction (event delegation — works for all sliders)
+    document.querySelector('table').addEventListener('mousedown', e => {
+        if (e.target.classList.contains('bar-slider') && !e.target.disabled) {
+            saveUndoSnapshot();
+        }
+    });
+});
+</script>
+
+</body>
+</html>
