@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Birdie — ABM Lookalikes Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f4f7fa;color:#1a2b3c;display:flex;height:100vh;overflow:hidden}
+
+/* SIDEBAR */
+#sidebar{width:220px;min-width:220px;background:#0d4f6c;display:flex;flex-direction:column;overflow-y:auto;z-index:10}
+.logo-wrap{padding:20px 16px 14px;border-bottom:1px solid rgba(255,255,255,.12)}
+.logo-wrap img{height:28px}
+.logo-sub{color:rgba(255,255,255,.55);font-size:10px;margin-top:4px;letter-spacing:.5px;text-transform:uppercase}
+#sidebar nav{flex:1;padding:10px 0}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 18px;cursor:pointer;color:rgba(255,255,255,.75);font-size:12.5px;font-weight:500;border-left:3px solid transparent;transition:all .18s;user-select:none}
+.nav-item:hover{background:rgba(255,255,255,.08);color:#fff}
+.nav-item.active{background:rgba(255,255,255,.13);color:#fff;border-left-color:#0d7a5f}
+.nav-item .icon{font-size:15px;width:18px;text-align:center}
+.nav-badge{background:#0d7a5f;color:#fff;font-size:10px;padding:2px 7px;border-radius:20px;margin-left:auto}
+
+/* MAIN */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+#topbar{background:#fff;border-bottom:1px solid #e2e8f0;padding:12px 24px;display:flex;align-items:center;gap:14px;flex-shrink:0}
+#topbar h1{font-size:14px;font-weight:700;color:#0d4f6c;flex:1;white-space:nowrap}
+#search{padding:7px 14px;border:1px solid #d1dbe8;border-radius:8px;font-size:12.5px;width:260px;outline:none;color:#1a2b3c}
+#search:focus{border-color:#0d4f6c}
+.btn{padding:7px 16px;background:#0d7a5f;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:background .18s;white-space:nowrap}
+.btn:hover{background:#0a6450}
+.btn.outline{background:#fff;color:#0d4f6c;border:1.5px solid #0d4f6c}
+.btn.outline:hover{background:#f0f7fb}
+
+/* KPI */
+#kpi-strip{display:flex;gap:10px;padding:14px 24px;flex-shrink:0;background:#fff;border-bottom:1px solid #e2e8f0}
+.kpi{flex:1;background:#f4f7fa;border-radius:10px;padding:11px 14px;border-left:3px solid #0d4f6c}
+.kpi.g{border-left-color:#0d7a5f}
+.kpi .val{font-size:22px;font-weight:800;color:#0d4f6c;line-height:1}
+.kpi.g .val{color:#0d7a5f}
+.kpi .lbl{font-size:10px;color:#6b7d8e;margin-top:3px;font-weight:500}
+
+/* CONTENT */
+#content{flex:1;overflow-y:auto;padding:20px 24px;min-width:0}
+.section{display:none}
+.section.active{display:block}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.chart-card{background:#fff;border-radius:12px;padding:16px 18px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.chart-card.full{grid-column:1/-1}
+.chart-card h3{font-size:11px;font-weight:700;color:#0d4f6c;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px}
+.chart-card h3 .hint{font-size:10px;color:#9ab;font-weight:400;text-transform:none;letter-spacing:0}
+.chart-wrap{position:relative;height:210px}
+.chart-wrap.tall{height:260px}
+
+/* DRILL PANEL */
+#drill{position:fixed;top:0;right:-480px;width:480px;height:100vh;background:#fff;box-shadow:-6px 0 30px rgba(0,0,0,.13);z-index:500;display:flex;flex-direction:column;transition:right .28s cubic-bezier(.4,0,.2,1)}
+#drill.open{right:0}
+#drill-header{background:#0d4f6c;color:#fff;padding:16px 20px;flex-shrink:0}
+#drill-header-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+#drill-title{font-size:14px;font-weight:700;line-height:1.3}
+#drill-subtitle{font-size:11px;opacity:.7;margin-top:2px}
+#drill-close{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;opacity:.8;padding:0;line-height:1}
+#drill-close:hover{opacity:1}
+#drill-actions{display:flex;gap:8px}
+.drill-export-btn{padding:6px 14px;background:#0d7a5f;color:#fff;border:none;border-radius:7px;font-size:11.5px;font-weight:600;cursor:pointer}
+.drill-export-btn:hover{background:#0a6450}
+#drill-body{flex:1;overflow-y:auto;padding:0}
+
+/* COMPANY ACCORDION */
+.co-block{border-bottom:1px solid #f0f4f8}
+.co-header{display:flex;align-items:center;padding:12px 18px;cursor:pointer;transition:background .15s;gap:10px}
+.co-header:hover{background:#f6fbff}
+.co-header.expanded{background:#f0f7fb}
+.co-arrow{font-size:11px;color:#9ab;transition:transform .2s;flex-shrink:0}
+.co-header.expanded .co-arrow{transform:rotate(90deg)}
+.co-name{font-size:12.5px;font-weight:700;color:#0d4f6c;flex:1}
+.co-meta{font-size:10.5px;color:#6b7d8e}
+.co-count{background:#e8f4fd;color:#0d4f6c;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;flex-shrink:0}
+.co-execs{display:none;padding:0 18px 14px 38px}
+.co-execs.open{display:block}
+.exec-row{display:flex;align-items:baseline;gap:10px;padding:5px 0;border-bottom:1px solid #f7f9fc;font-size:12px}
+.exec-row:last-child{border-bottom:none}
+.exec-name{font-weight:600;color:#1a2b3c;min-width:160px;flex-shrink:0}
+.exec-title{color:#4a5568;flex:1}
+.exec-li a{color:#0d7a5f;font-size:11px;font-weight:600;text-decoration:none;white-space:nowrap}
+.exec-li a:hover{text-decoration:underline}
+
+/* TABLE */
+.table-wrap{background:#fff;border-radius:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden}
+.table-controls{padding:12px 16px;display:flex;gap:10px;align-items:center;border-bottom:1px solid #f0f4f8;flex-wrap:wrap}
+.table-controls input,.filter-sel{padding:7px 12px;border:1px solid #d1dbe8;border-radius:7px;font-size:12px;outline:none;color:#1a2b3c}
+.table-controls input{flex:1;min-width:180px}
+.table-controls input:focus{border-color:#0d4f6c}
+.filter-sel{cursor:pointer}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{background:#0d4f6c;color:#fff;padding:9px 12px;text-align:left;font-weight:600;font-size:11px;white-space:nowrap}
+tbody tr{border-bottom:1px solid #f0f4f8;cursor:pointer;transition:background .12s}
+tbody tr:hover{background:#f0f9ff}
+tbody td{padding:8px 12px;vertical-align:middle}
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600;background:#e8f4fd;color:#0d4f6c}
+.tag.g{background:#e6f7f2;color:#0d7a5f}
+
+/* MODAL */
+#modal-overlay{display:none;position:fixed;inset:0;background:rgba(10,25,40,.45);z-index:800;align-items:center;justify-content:center}
+#modal-overlay.open{display:flex}
+#modal{background:#fff;border-radius:14px;width:680px;max-width:95vw;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18)}
+#modal-hd{background:#0d4f6c;color:#fff;padding:18px 22px;border-radius:14px 14px 0 0;display:flex;justify-content:space-between;align-items:flex-start}
+#modal-hd h2{font-size:15px;font-weight:700}
+#modal-hd .sub{font-size:11px;opacity:.7;margin-top:3px}
+#modal-hd .x{cursor:pointer;font-size:20px;opacity:.7;background:none;border:none;color:#fff;line-height:1}
+#modal-hd .x:hover{opacity:1}
+#modal-bd{padding:20px 22px}
+.m-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;margin-bottom:16px}
+.mf .ml{color:#6b7d8e;font-size:10px;text-transform:uppercase;letter-spacing:.3px}
+.mf .mv{font-weight:600;color:#1a2b3c;font-size:12px;margin-top:2px}
+.sec-lbl{font-size:11px;font-weight:700;color:#0d4f6c;text-transform:uppercase;letter-spacing:.4px;margin:14px 0 8px;border-bottom:1px solid #e8eef4;padding-bottom:5px}
+.et{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+.et thead th{background:#f4f7fa;color:#0d4f6c;padding:7px 10px;text-align:left;font-weight:700;font-size:11px}
+.et tbody tr{border-bottom:1px solid #f0f4f8}
+.et tbody td{padding:7px 10px;vertical-align:middle}
+.et a{color:#0d7a5f;text-decoration:none;font-weight:600}
+.et a:hover{text-decoration:underline}
+.tech-pill{display:inline-block;background:#e8f4fd;color:#0d4f6c;border-radius:20px;padding:2px 9px;font-size:10.5px;margin:2px;font-weight:500}
+
+/* PAGINATION */
+.pager{display:flex;gap:5px;justify-content:center;padding:12px;align-items:center;flex-wrap:wrap}
+.pg{padding:5px 10px;border:1px solid #d1dbe8;border-radius:6px;cursor:pointer;background:#fff;font-size:12px;transition:all .15s}
+.pg:hover,.pg.on{background:#0d4f6c;color:#fff;border-color:#0d4f6c}
+.pg:disabled{opacity:.4;cursor:default}
+.pg-info{color:#6b7d8e;font-size:11px;margin:0 6px}
+
+/* COMPANIES VIEW */
+.co-cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:16px}
+.co-card{background:#fff;border-radius:10px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.06);cursor:pointer;border:1.5px solid transparent;transition:all .18s}
+.co-card:hover{border-color:#0d7a5f;box-shadow:0 4px 16px rgba(13,122,95,.1)}
+.co-card .cn{font-size:13px;font-weight:700;color:#0d4f6c;margin-bottom:4px}
+.co-card .cs{font-size:11px;color:#6b7d8e;margin-bottom:8px}
+.co-card .ce{font-size:11.5px;color:#1a2b3c;line-height:1.7}
+.co-card .ce .en{font-weight:600}
+.co-card .ce .et{color:#6b7d8e}
+.co-card .more{font-size:11px;color:#0d7a5f;font-weight:600;margin-top:4px}
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div class="logo-wrap">
+    <img src="https://cdn.prod.website-files.com/6335b33630f88833b943aa97/6335b33630f88833b943ab34_birdie-logo.svg" onerror="this.style.display='none'">
+    <div class="logo-sub">ABM Lookalikes · Zendesk</div>
+  </div>
+  <nav>
+    <div class="nav-item active" onclick="show('overview')"><span class="icon">📊</span>Overview</div>
+    <div class="nav-item" onclick="show('segments')"><span class="icon">🏷️</span>Segments</div>
+    <div class="nav-item" onclick="show('firmographics')"><span class="icon">🏢</span>Firmographics</div>
+    <div class="nav-item" onclick="show('geography')"><span class="icon">🌎</span>Geography</div>
+    <div class="nav-item" onclick="show('companies')"><span class="icon">🏗️</span>Companies + Execs <span class="nav-badge">55</span></div>
+    <div class="nav-item" onclick="show('all-execs')"><span class="icon">👤</span>All Executives <span class="nav-badge">308</span></div>
+  </nav>
+</div>
+
+<div id="main">
+  <div id="topbar">
+    <h1>Birdie — ABM Lookalikes</h1>
+    <input id="search" type="text" placeholder="Search companies or executives…" oninput="globalSearch(this.value)">
+    <button class="btn" onclick="exportAll()">⬇ Export All</button>
+  </div>
+
+  <div id="kpi-strip">
+    <div class="kpi"><div class="val">55</div><div class="lbl">Companies</div></div>
+    <div class="kpi g"><div class="val">308</div><div class="lbl">Key Executives</div></div>
+    <div class="kpi"><div class="val">21</div><div class="lbl">Segments</div></div>
+    <div class="kpi g"><div class="val">2</div><div class="lbl">Countries</div></div>
+    <div class="kpi"><div class="val">5.6</div><div class="lbl">Avg Execs / Co.</div></div>
+  </div>
+
+  <div id="content">
+
+    <!-- OVERVIEW -->
+    <div class="section active" id="sec-overview">
+      <div class="charts-grid">
+        <div class="chart-card"><h3>By Segment <span class="hint">— click to see executives</span></h3><div class="chart-wrap"><canvas id="ch-seg"></canvas></div></div>
+        <div class="chart-card"><h3>Annual Revenue <span class="hint">— click to see executives</span></h3><div class="chart-wrap"><canvas id="ch-rev"></canvas></div></div>
+        <div class="chart-card"><h3>Employee Size <span class="hint">— click to see executives</span></h3><div class="chart-wrap"><canvas id="ch-emp"></canvas></div></div>
+        <div class="chart-card"><h3>Country <span class="hint">— click to see executives</span></h3><div class="chart-wrap"><canvas id="ch-ctr"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- SEGMENTS -->
+    <div class="section" id="sec-segments">
+      <div class="charts-grid">
+        <div class="chart-card full"><h3>Segment Distribution <span class="hint">— click a bar to see executives</span></h3><div class="chart-wrap tall"><canvas id="ch-seg2"></canvas></div></div>
+        <div class="chart-card"><h3>Avg Executives by Segment <span class="hint">— click to see executives</span></h3><div class="chart-wrap"><canvas id="ch-seg-exec"></canvas></div></div>
+        <div class="chart-card"><h3>Revenue Score by Segment</h3><div class="chart-wrap"><canvas id="ch-seg-rev"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- FIRMOGRAPHICS -->
+    <div class="section" id="sec-firmographics">
+      <div class="charts-grid">
+        <div class="chart-card"><h3>Revenue Bands <span class="hint">— click to see executives</span></h3><div class="chart-wrap"><canvas id="ch-firm-rev"></canvas></div></div>
+        <div class="chart-card"><h3>Employee Size <span class="hint">— click to see executives</span></h3><div class="chart-wrap"><canvas id="ch-firm-emp"></canvas></div></div>
+        <div class="chart-card full"><h3>Industry <span class="hint">— click to see executives</span></h3><div class="chart-wrap" style="height:200px"><canvas id="ch-firm-ind"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- GEOGRAPHY -->
+    <div class="section" id="sec-geography">
+      <div class="charts-grid">
+        <div class="chart-card"><h3>Country <span class="hint">— click to see executives</span></h3><div class="chart-wrap"><canvas id="ch-geo-ctr"></canvas></div></div>
+        <div class="chart-card"><h3>Top Cities <span class="hint">— click to see executives</span></h3><div class="chart-wrap"><canvas id="ch-geo-city"></canvas></div></div>
+        <div class="chart-card full"><h3>USA vs Canada by Segment</h3><div class="chart-wrap" style="height:220px"><canvas id="ch-geo-seg"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- COMPANIES + EXECS -->
+    <div class="section" id="sec-companies">
+      <div style="display:flex;gap:10px;margin-bottom:14px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="co-q" placeholder="Filter companies…" oninput="renderCoCards()" style="padding:8px 14px;border:1px solid #d1dbe8;border-radius:8px;font-size:12.5px;outline:none;flex:1;min-width:180px">
+        <select class="filter-sel" id="co-seg" onchange="renderCoCards()"><option value="">All Segments</option></select>
+        <select class="filter-sel" id="co-rev" onchange="renderCoCards()"><option value="">All Revenue</option></select>
+        <button class="btn" onclick="exportFilteredCos()">⬇ Export Filtered</button>
+      </div>
+      <div id="co-cards"></div>
+      <div id="co-pager"></div>
+    </div>
+
+    <!-- ALL EXECUTIVES -->
+    <div class="section" id="sec-all-execs">
+      <div class="table-wrap">
+        <div class="table-controls">
+          <input type="text" id="ex-q" placeholder="Search by name, title or company…" oninput="filterExecs()">
+          <select class="filter-sel" id="ex-seg" onchange="filterExecs()"><option value="">All Segments</option></select>
+          <button class="btn" onclick="exportExecsFiltered()">⬇ Export</button>
+        </div>
+        <table>
+          <thead><tr><th>Name</th><th>Title</th><th>Company</th><th>Segment</th><th>Revenue</th><th>LinkedIn</th></tr></thead>
+          <tbody id="ex-tbody"></tbody>
+        </table>
+        <div id="ex-pager"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- DRILL PANEL -->
+<div id="drill">
+  <div id="drill-header">
+    <div id="drill-header-top">
+      <div>
+        <div id="drill-title">Executives</div>
+        <div id="drill-subtitle"></div>
+      </div>
+      <button id="drill-close" onclick="closeDrill()">✕</button>
+    </div>
+    <div id="drill-actions">
+      <button class="drill-export-btn" onclick="exportDrill()">⬇ Export this list (CSV)</button>
+    </div>
+  </div>
+  <div id="drill-body"></div>
+</div>
+
+<!-- MODAL -->
+<div id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div id="modal">
+    <div id="modal-hd">
+      <div><h2 id="m-title"></h2><div class="sub" id="m-sub"></div></div>
+      <button class="x" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-bd"></div>
+  </div>
+</div>
+
+<script>
+const DATA = [{"abm_ref": "StubHub; SeatGeek", "name": "Vivid Seats", "segment": "Events / Entertainment / Tickets", "country": "USA", "website": "vividseats.com", "industry": "Technology, Information and Internet", "revenue": "500M-1B", "employees": "525", "emp_bucket": "500\u2013999", "location": "Chicago, IL", "customers": "12000000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "jamarr Tillman", "title": "Coordinator 1 tech support", "url": "https://www.linkedin.com/in/jamarr-tillman-1b066976/"}, {"name": "Katy Smith", "title": "Director, Agent Experience", "url": "https://www.linkedin.com/in/smithkatym/"}, {"name": "Bill Francione", "title": "Senior Vice President of Customer Experience Vivid Seats", "url": "https://www.linkedin.com/in/bill-francione-4a004bb/"}, {"name": "Jeff Doden", "title": "Director of Client Operations", "url": "https://www.linkedin.com/in/jeff-doden/"}, {"name": "Quintina Mengyan", "title": "Director of Customer Experience & Fulfillment", "url": "https://www.linkedin.com/in/hireq/"}, {"name": "Phoebe Nelson", "title": "Head of Implementations", "url": "https://www.linkedin.com/in/phoebe-nelson-07147626/"}, {"name": "Zeenat Vastrad", "title": "Head of Design", "url": "https://www.linkedin.com/in/zeenat-vastrad-87b6595/"}, {"name": "Adam Baes", "title": "Senior Director, Buyer Operations", "url": "https://www.linkedin.com/in/adam-baes-ba685170/"}]}, {"abm_ref": "Lemonade", "name": "League", "segment": "Insurance / Insurtech", "country": "Canada", "website": "league.com", "industry": "Technology, Information and Internet", "revenue": "75M-200M", "employees": "528", "emp_bucket": "500\u2013999", "location": "Toronto, Ontario", "customers": "63000000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Manami Kunz", "title": "Head of Product, Partner, and Customer Operations", "url": "https://www.linkedin.com/in/manamikunz/"}, {"name": "Michael Engels, MBA", "title": "Associate Director, Strategic Portfolio Management", "url": "https://www.linkedin.com/in/michael-engels/"}, {"name": "Amrita Singh, CPA, CMA", "title": "Director, Customer Experience Programs", "url": "https://www.linkedin.com/in/amritasingh45/"}, {"name": "Alicia Brum", "title": "Director of Client Experience", "url": "https://www.linkedin.com/in/aliciabrum/"}, {"name": "Kirby Marcure SHRM-SCP, GBA", "title": "Client Services Director", "url": "https://www.linkedin.com/in/kirby-marcure-shrm-scp-gba-82105032/"}, {"name": "Sharon Razo", "title": "Vice President of Sales", "url": "https://www.linkedin.com/in/sharon-razo-12711016/"}, {"name": "Maulin Shah, PMP, CCXP", "title": "Executive Director, Customer Service Strategy and Planning", "url": "https://www.linkedin.com/in/maulinvshah/"}]}, {"abm_ref": "Lyft", "name": "HopSkipDrive", "segment": "Travel / Mobility / Transport", "country": "USA", "website": "hopskipdrive.com", "industry": "Technology, Information and Internet", "revenue": "75M-200M", "employees": "529", "emp_bucket": "500\u2013999", "location": "Los Angeles, California", "customers": "2000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Emily Uhland", "title": "VP of Customer Success", "url": "https://www.linkedin.com/in/emily-uhland-74b1a446/"}, {"name": "Mitchell Hulyk", "title": "Director of Customer Success", "url": "https://www.linkedin.com/in/mitchell-hulyk-08933b1b/"}, {"name": "Jennifer Parrish Atkinson", "title": "Senior Managing Director, Dartmouth College Fund Centennial Circle", "url": "https://www.linkedin.com/in/jpatkinson/"}, {"name": "Michael Hardiman", "title": "Head of Partnerships", "url": "https://www.linkedin.com/in/michael-hardiman-62257812/"}, {"name": "Jo-Anne Thomas", "title": "Regional Director, Customer Success", "url": "https://www.linkedin.com/in/jo-anne-thomas-026a1217/"}, {"name": "Justin Sundheimer", "title": "Senior Director of Safe Ride Support", "url": "https://www.linkedin.com/in/justin-sundheimer-2527762b/"}]}, {"abm_ref": "Deel", "name": "Lattice", "segment": "HR Tech / Workforce", "country": "USA", "website": "lattice.com", "industry": "Software Development", "revenue": "200M-500M", "employees": "533", "emp_bucket": "500\u2013999", "location": "San Francisco, California", "customers": "5000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Allison Manne", "title": "Head of Talent", "url": "https://www.linkedin.com/in/allisonvalentine/"}, {"name": "Kei Kim", "title": "Director, Activation", "url": "https://www.linkedin.com/in/keiykim/"}, {"name": "Emily Wasmund", "title": "Vice President, Global Customer Success - Corporate", "url": "https://www.linkedin.com/in/emilywasmund/"}, {"name": "Dayna Hardie", "title": "VP, Customer Care and Activation", "url": "https://www.linkedin.com/in/daynahardie/"}, {"name": "Alex Yu, Ed.D.", "title": "Vice President of Customer Experience and Operations", "url": "https://www.linkedin.com/in/alexanderwilliamyu/"}, {"name": "Grant Maestas Estevez", "title": "Vice President of Customer Success", "url": "https://www.linkedin.com/in/grant-maestas-estevez/"}, {"name": "David Pyrzenski", "title": "VP of Customer Success", "url": "https://www.linkedin.com/in/pyrzenski/"}]}, {"abm_ref": "Udemy", "name": "Skillshare", "segment": "EdTech", "country": "USA", "website": "skillshare.com", "industry": "E-Learning Providers", "revenue": "75M-200M", "employees": "553", "emp_bucket": "500\u2013999", "location": "New York City, NY", "customers": "nan", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Ryan K.", "title": "Head of Customer Experience", "url": "https://www.linkedin.com/in/ryankow/"}, {"name": "Ellen McKay Lorenzo", "title": "SVP of Sales, Customer Success and Operations", "url": "https://www.linkedin.com/in/ellen-mckay-lorenzo-248a6866/"}, {"name": "Sarah Lum", "title": "Director of Customer Experience", "url": "https://www.linkedin.com/in/sarahlum00/"}, {"name": "Mike Lorenzen", "title": "Co-Founder, Head of Operations", "url": "https://www.linkedin.com/in/michaeljlorenzen/"}]}, {"abm_ref": "Mixpanel", "name": "FullStory", "segment": "Data / Analytics / GTM", "country": "USA", "website": "fullstory.com", "industry": "Software Development", "revenue": "200M-500M", "employees": "565", "emp_bucket": "500\u2013999", "location": "Atlanta, Georgia", "customers": "3500.0", "tech": [], "zendesk": "Zendesk", "executives": []}, {"abm_ref": "Mixpanel", "name": "LaunchDarkly", "segment": "Data / Analytics / GTM", "country": "USA", "website": "launchdarkly.com", "industry": "Software Development", "revenue": "200M-500M", "employees": "623", "emp_bucket": "500\u2013999", "location": "Oakland, CA", "customers": "5500.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Adam L.", "title": "Director, Technical Support", "url": "https://www.linkedin.com/in/adamlobb/"}, {"name": "Josh Levin", "title": "Director, Customer Success - Americas", "url": "https://www.linkedin.com/in/joshualevin626/"}, {"name": "Emma Mailey", "title": "Director, Customer Success International", "url": "https://www.linkedin.com/in/emma-mailey-76517b17/"}, {"name": "Aaron Woods", "title": "Head of Global Client Experience", "url": "https://www.linkedin.com/in/aaron-woods-262b9a64/"}, {"name": "Gigi Neuenfeldt", "title": "VP Customer Experience", "url": "https://www.linkedin.com/in/gigi-neuenfeldt-91504437/"}, {"name": "Ario Jafarzadeh", "title": "Head of Product Design", "url": "https://www.linkedin.com/in/arioxyz/"}, {"name": "Hector Hernandez", "title": "Chief Operating Officer", "url": "https://www.linkedin.com/in/hector-hernandez-845b417/"}, {"name": "Jenna Bilotta", "title": "Head of Product - Frame.io", "url": "https://www.linkedin.com/in/jenna-bilotta-6a50091/"}]}, {"abm_ref": "Opendoor; Zillow", "name": "Orchard", "segment": "Proptech / Real Estate", "country": "USA", "website": "orchard.com", "industry": "Real Estate", "revenue": "200M-500M", "employees": "669", "emp_bucket": "500\u2013999", "location": "New York, New York", "customers": "10000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Brandon Blahnik-", "title": "Vice President of Client Success", "url": "https://www.linkedin.com/in/brandon-blahnik-6b58352a/"}, {"name": "Jenna Rozenblat", "title": "COO", "url": "https://www.linkedin.com/in/jennarozenblat/"}, {"name": "Elizabeth Bernstein", "title": "Director, Consumer Product", "url": "https://www.linkedin.com/in/elizabethbernstein20/"}, {"name": "Rahil Esmail", "title": "VP of Product and Technology", "url": "https://www.linkedin.com/in/rahil-esmail/"}]}, {"abm_ref": "Bill.com; Ramp", "name": "Melio", "segment": "Fintech / Payments", "country": "USA", "website": "meliopayments.com", "industry": "Financial Services", "revenue": "200M-500M", "employees": "682", "emp_bucket": "500\u2013999", "location": "New York", "customers": "100000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Dafna Bareket", "title": "VP CX & Payment Operations, GM US", "url": "https://www.linkedin.com/in/dafna-bareket-2032071a2/"}, {"name": "Jasmin M.", "title": "Director of Operations (CX)", "url": "https://www.linkedin.com/in/jasminmcd/"}, {"name": "Whitley Romero Liberato", "title": "Director of Customer Support", "url": "https://www.linkedin.com/in/whitley-romero-liberato-656b9a73/"}, {"name": "Christopher Knecht", "title": "Director of Customer Success", "url": "https://www.linkedin.com/in/christopher-knecht-6a93075/"}, {"name": "Dave Behm", "title": "VP of Ad Operations & Client Solutions", "url": "https://www.linkedin.com/in/davidmbehm/"}, {"name": "Debbie Stevens", "title": "VP, Multi-product Activation", "url": "https://www.linkedin.com/in/borah1stev/"}, {"name": "Ingrid Olson", "title": "VP of Customer Happiness", "url": "https://www.linkedin.com/in/inolson/"}, {"name": "Sawu J.", "title": "Head of Customer Experience", "url": "https://www.linkedin.com/in/sawu-j-936379ab/"}]}, {"abm_ref": "Strava; Runna", "name": "Future", "segment": "Health / Wellness / Fitness", "country": "USA", "website": "future.co", "industry": "Wellness and Fitness Services", "revenue": "75M-200M", "employees": "746", "emp_bucket": "500\u2013999", "location": "San Francisco, California", "customers": "nan", "tech": [], "zendesk": "Zendesk", "executives": []}, {"abm_ref": "Headspace", "name": "Calm", "segment": "Health / Wellness / Fitness", "country": "USA", "website": "calm.com", "industry": "Mental Health Care", "revenue": "75M-200M", "employees": "759", "emp_bucket": "500\u2013999", "location": "San Francisco, California", "customers": "1000000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Nina Bankar", "title": "SVP, Customer Experience", "url": "https://www.linkedin.com/in/nina-bankar-552767/"}, {"name": "Meredith (Behm) McRae", "title": "Director of Customer Success", "url": "https://www.linkedin.com/in/meredithbehm/"}, {"name": "Layna Smith", "title": "Head of Customer Success", "url": "https://www.linkedin.com/in/laynasmith/"}, {"name": "Elizabeth Fermon", "title": "SVP, Audience Engagement", "url": "https://www.linkedin.com/in/elizabeth-fermon-a6b36221/"}, {"name": "Michael Grillo", "title": "VP, Marketing & Special Projects", "url": "https://www.linkedin.com/in/michaeljgrillo/"}, {"name": "Brenda Yang", "title": "SVP & GM, Calm Consumer", "url": "https://www.linkedin.com/in/brendapyang/"}, {"name": "Tim Hwang", "title": "Vice President, B2B Marketing", "url": "https://www.linkedin.com/in/tim-hwang-5824062/"}]}, {"abm_ref": "Udemy", "name": "MasterClass", "segment": "EdTech", "country": "USA", "website": "masterclass.com", "industry": "E-Learning Providers", "revenue": "75M-200M", "employees": "792", "emp_bucket": "500\u2013999", "location": "San Francisco, California", "customers": "2000000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Bennett Florence", "title": "Sr Director of Partnerships and Business Development", "url": "https://www.linkedin.com/in/bennett-florence-8a034021/"}, {"name": "Kalpana Chandrasekhar", "title": "Head of Customer Success, Strategic Accounts & Verticals", "url": "https://www.linkedin.com/in/kchandrasekhar/"}, {"name": "Lotus L.", "title": "User Experience Research Lead VP", "url": "https://www.linkedin.com/in/lotuslee/"}, {"name": "Stephanie Chevalier", "title": "Senior Vice President Marketing", "url": "https://www.linkedin.com/in/stephaniechevalier/"}, {"name": "Robbie Giles", "title": "SVP, Consumer Marketing", "url": "https://www.linkedin.com/in/robbie-giles-a16a5b29/"}, {"name": "Vaasvi Goyal", "title": "Senior Director - GM, Consumer MasterClasses", "url": "https://www.linkedin.com/in/vaasvigoyal/"}, {"name": "Aleksandra Georgieva", "title": "Sr. Director of Product, Consumer Innovation", "url": "https://www.linkedin.com/in/aleksandrageorgieva/"}, {"name": "Farzona Pulatova", "title": "VP of Engineering", "url": "https://www.linkedin.com/in/farzona/"}, {"name": "Stephanie Mohr", "title": "Senior Director of Member Support", "url": "https://www.linkedin.com/in/stephanie-mohr-9715a714/"}]}, {"abm_ref": "Ticketmaster; SeatGeek", "name": "AXS", "segment": "Events / Entertainment / Tickets", "country": "USA", "website": "axs.com", "industry": "Entertainment Providers", "revenue": "75M-200M", "employees": "830", "emp_bucket": "500\u2013999", "location": "Los Angeles, CA", "customers": "nan", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Jack McCarty", "title": "Head of Festivals and Greenfield Events", "url": "https://www.linkedin.com/in/jack-mccarty-17302612/"}, {"name": "Barbara W.", "title": "VP, Ticketing Operations", "url": "https://www.linkedin.com/in/bgwatson/"}, {"name": "Evan Rowe", "title": "Director of Client Services", "url": "https://www.linkedin.com/in/evan-rowe-4a117965/"}, {"name": "Kevin Meheut", "title": "Director Of Client Services", "url": "https://www.linkedin.com/in/kevin-meheut-1900b523/"}, {"name": "Carrie Farina", "title": "Director of Client Services", "url": "https://www.linkedin.com/in/carriejfarina/"}, {"name": "Penny S.", "title": "Director of Client Services", "url": "https://www.linkedin.com/in/pennysup/"}, {"name": "Jenny Suh", "title": "Vice President of User Experience and Design", "url": "https://www.linkedin.com/in/jennysuh/"}, {"name": "Alison Jeeves", "title": "Director of Onsales Management", "url": "https://www.linkedin.com/in/alison-jeeves-679ba525/"}, {"name": "Joni Mariano", "title": "Director, Client Services - Arenas & Stadiums", "url": "https://www.linkedin.com/in/joni-mariano-040aa2222/"}]}, {"abm_ref": "DoorDash; Grubhub", "name": "Olo", "segment": "Food / Grocery Delivery", "country": "USA", "website": "olo.com", "industry": "Software Development", "revenue": "200M-500M", "employees": "874", "emp_bucket": "500\u2013999", "location": "New York, NY", "customers": "750.0", "tech": [], "zendesk": "Zendesk Support, Zendesk", "executives": [{"name": "Nicole Fleiner", "title": "VP, Customer Success", "url": "https://www.linkedin.com/in/nicole-fleiner-2061804/"}, {"name": "Tyson Swanger", "title": "Director Customer Support", "url": "https://www.linkedin.com/in/tyson-swanger/"}, {"name": "Sarah Southerland", "title": "Director, Customer Experience", "url": "https://www.linkedin.com/in/sarahsoutherland/"}, {"name": "Leslie Sanchez", "title": "Director, Customer Support & Operations", "url": "https://www.linkedin.com/in/leslie-sanchez-b3b4a2149/"}, {"name": "Anissa Comonte-Moret", "title": "Associate Director, CX Operations", "url": "https://www.linkedin.com/in/amcm18/"}]}, {"abm_ref": "Upgrade; Happy Money", "name": "Avant", "segment": "BNPL / Credit / Lending", "country": "USA", "website": "avant.com", "industry": "Financial Services", "revenue": "200M-500M", "employees": "916", "emp_bucket": "500\u2013999", "location": "Chicago, IL", "customers": "2000000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Jena Acuff", "title": "Senior Director, CX and Design", "url": "https://www.linkedin.com/in/jena-acuff/"}, {"name": "Jevonna Johnson", "title": "Senior Vice President Operations", "url": "https://www.linkedin.com/in/jevonna-johnson-4b7abb11/"}, {"name": "Max Rothstein", "title": "Head of Solutions and Integrations", "url": "https://www.linkedin.com/in/max-rothstein-23904b15/"}, {"name": "Rachel Kessler", "title": "Director, Business Risk Management", "url": "https://www.linkedin.com/in/rachel-kessler-85b07534/"}, {"name": "Loren Andersen", "title": "Director, Strategy & Operations - Head of Customer Operations", "url": "https://www.linkedin.com/in/loren-andersen-5371146/"}, {"name": "Laura Nieder", "title": "Sr. Director of Strategy and Operations, Digital", "url": "https://www.linkedin.com/in/lnieder/"}, {"name": "Chase Schwalbach", "title": "SVP Product and Technology", "url": "https://www.linkedin.com/in/schwalbach/"}]}, {"abm_ref": "AllTrails; Strava", "name": "Fatmap", "segment": "Outdoor / Active", "country": "USA", "website": "fatmap.com", "industry": "Software Development", "revenue": "200M-500M", "employees": "936", "emp_bucket": "500\u2013999", "location": "San Francisco, California", "customers": "180000000.0", "tech": [], "zendesk": "Zendesk Sunshine Conversations, Zendesk", "executives": [{"name": "Lorna Finnegan", "title": "Director, Customer Experience (CX)", "url": "https://www.linkedin.com/in/lorna-finnegan-90871374/"}, {"name": "Travis Robison", "title": "Director of Technical Support", "url": "https://www.linkedin.com/in/travis-robison-873a8a5/"}, {"name": "Amy Jackson", "title": "Director of Consumer Communications", "url": "https://www.linkedin.com/in/amy-jackson-a238178/"}, {"name": "Rosamar\u00eda G.", "title": "Vice President, Community", "url": "https://www.linkedin.com/in/gonzalezrosamaria/"}, {"name": "Ashley W.", "title": "Sr. Director, Scalable Support", "url": "https://www.linkedin.com/in/ashley-w-74656058/"}]}, {"abm_ref": "Mixpanel", "name": "Amplitude", "segment": "Data / Analytics / GTM", "country": "USA", "website": "amplitude.com", "industry": "Software Development", "revenue": "200M-500M", "employees": "984", "emp_bucket": "500\u2013999", "location": "San Francisco, California", "customers": "698.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Nicole Morrison", "title": "Customer Success Director", "url": "https://www.linkedin.com/in/nicole-morrison-28949741/"}, {"name": "Jenna Schwalbe Elliott", "title": "VP, Global Customer Success", "url": "https://www.linkedin.com/in/jennaselliott/"}, {"name": "Sherrill Roberts", "title": "Senior Director, Customer Success (Enterprise & Mid Market)", "url": "https://www.linkedin.com/in/sherrillroberts/"}, {"name": "Rachel Bethany", "title": "Director, APJ Customer Success", "url": "https://www.linkedin.com/in/rbethany/"}, {"name": "Alissa (Hawkins) Lem", "title": "Director, Enterprise Customer Success", "url": "https://www.linkedin.com/in/alissahawkinslem/"}]}, {"abm_ref": "Wise; Thunes", "name": "Nium", "segment": "Fintech / Payments", "country": "USA", "website": "nium.com", "industry": "Financial Services", "revenue": "200M-500M", "employees": "1028", "emp_bucket": "1K\u20131.9K", "location": "San Francisco, California", "customers": "104500000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Jill Docherty", "title": "Head of SMB Portfolio Management & Customer Success, Rest of the World", "url": "https://www.linkedin.com/in/jill-docherty-a2b2471a/"}, {"name": "John McNaught", "title": "Senior Vice President, Head of Payouts", "url": "https://www.linkedin.com/in/john-mcnaught-5789ba3a/"}, {"name": "Abhay Salitri", "title": "VP - Network Management & Expansion (APAC & MEA)", "url": "https://www.linkedin.com/in/abhay-salitri-1246279/"}, {"name": "Swati Roy-Mitra", "title": "Global Head of Operations I Payments Risk Operations", "url": "https://www.linkedin.com/in/swati-roy-mitra-4133312/"}, {"name": "Ragavendiran Kumaraguru", "title": "Director, Program Management & Service Delivery", "url": "https://www.linkedin.com/in/ragavendiran-kumaraguru-38288424/"}]}, {"abm_ref": "Ibotta", "name": "Fetch Rewards", "segment": "Cashback / Loyalty / Rewards", "country": "USA", "website": "fetchrewards.com", "industry": "Technology, Information and Internet", "revenue": "500M-1B", "employees": "1041", "emp_bucket": "1K\u20131.9K", "location": "Hybrid-remote workplace", "customers": "12500000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Brian Johnson", "title": "VP Support & Fraud Operations", "url": "https://www.linkedin.com/in/brian-johnson-57ba563/"}, {"name": "David Cutler", "title": "VP Product - Consumer Experience", "url": "https://www.linkedin.com/in/david-cutler-mpa-cae-7b86162b/"}, {"name": "Dhwani Worah Upadhyay", "title": "VP, Enterprise AI Strategy & Enablement", "url": "https://www.linkedin.com/in/dhwani-worah-upadhyay-consumermarketinginsightsanalytics/"}, {"name": "Emily Arnau", "title": "Vice President, Customer Experience Continuous Improvement", "url": "https://www.linkedin.com/in/emily-arnau-ba670267/"}, {"name": "John Picardo", "title": "Director, Consumer Experience Product GTM", "url": "https://www.linkedin.com/in/john-picardo-aa8563b/"}]}, {"abm_ref": "Mixpanel", "name": "Pendo", "segment": "Data / Analytics / GTM", "country": "USA", "website": "pendo.io", "industry": "Software Development", "revenue": "500M-1B", "employees": "1049", "emp_bucket": "1K\u20131.9K", "location": "Raleigh, North Carolina", "customers": "50000.0", "tech": [], "zendesk": "Zendesk Guide, Zendesk", "executives": [{"name": "Dan Demas", "title": "Chief Operating Officer", "url": "https://www.linkedin.com/in/dandemas/"}, {"name": "Melinda Gonzalez", "title": "Senior Director Customer Advocacy, Office of the CEO", "url": "https://www.linkedin.com/in/melinda-gonzalez-a971461/"}]}, {"abm_ref": "Poshmark; The Real Real", "name": "ThredUp", "segment": "Marketplace / eCommerce", "country": "USA", "website": "thredup.com", "industry": "Retail Apparel and Fashion", "revenue": "200M-500M", "employees": "1076", "emp_bucket": "1K\u20131.9K", "location": "Oakland, California", "customers": "1650000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Alex Schernig", "title": "Head of Customer Success", "url": "https://www.linkedin.com/in/alexschernig/"}, {"name": "Michelle Lee", "title": "Partner and Executive Co-Managing Director, IDEO San Francisco", "url": "https://www.linkedin.com/in/michelle-lee-schmidt-3494b95/"}, {"name": "Nancy-Ellen Martin", "title": "Director of Customer Service", "url": "https://www.linkedin.com/in/nancy-ellen-martin-87b2286/"}, {"name": "Christine Iovino", "title": "Head of Business Development and Client Success", "url": "https://www.linkedin.com/in/christineiovino/"}, {"name": "Sam Blumenthal", "title": "Director of Communications", "url": "https://www.linkedin.com/in/sam-m-blumenthal/"}, {"name": "Dianne D.", "title": "Marketing Contractor", "url": "https://www.linkedin.com/in/diannedeguzman/"}]}, {"abm_ref": "Binance; OKX", "name": "Kraken", "segment": "Crypto / Investment", "country": "USA", "website": "kraken.com", "industry": "Financial Services", "revenue": "1B-10B", "employees": "1082", "emp_bucket": "1K\u20131.9K", "location": "Remote First", "customers": "5700000.0", "tech": [], "zendesk": "Zendesk, Zendesk Chat", "executives": [{"name": "Erich Rickens", "title": "Director, VIP Clients", "url": "https://www.linkedin.com/in/erich-rickens-a3329912a/"}, {"name": "Bryce Porter", "title": "Chief Executive Officer", "url": "https://www.linkedin.com/in/bryce-porter-32448b1b4/"}, {"name": "Dr. Johannes S.", "title": "Co-Chief Executive Officer", "url": "https://www.linkedin.com/in/johannesschmitt/"}, {"name": "Ashley Speller", "title": "VP, Client Engagement", "url": "https://www.linkedin.com/in/ashley-speller-4094893/"}, {"name": "Caine Knight", "title": "Global Head of Strategic Partnerships", "url": "https://www.linkedin.com/in/caine-knight-104890136/"}, {"name": "Noha Afifi", "title": "Global Senior Director of Client Experience", "url": "https://www.linkedin.com/in/noha-afifi-18240b15/"}, {"name": "Mark Greenberg", "title": "Head of Payward Services (B2B)", "url": "https://www.linkedin.com/in/marklg/"}, {"name": "Pedro Bettani", "title": "Head of Product Platform - Consumer", "url": "https://www.linkedin.com/in/pedro-bettani-168a0721/"}]}, {"abm_ref": "Mixpanel; Apollo", "name": "Gainsight", "segment": "Data / Analytics / GTM", "country": "USA", "website": "gainsight.com", "industry": "Software Development", "revenue": "500M-1B", "employees": "1104", "emp_bucket": "1K\u20131.9K", "location": "San Francisco, California", "customers": "2000.0", "tech": [], "zendesk": "Zendesk Support", "executives": [{"name": "Roman Dalichow", "title": "Vice President, Customer Success", "url": "https://www.linkedin.com/in/romandalichow/"}]}, {"abm_ref": "Bill.com; Ramp", "name": "Tipalti", "segment": "Fintech / Payments", "country": "USA", "website": "tipalti.com", "industry": "Financial Services", "revenue": "1B-10B", "employees": "1157", "emp_bucket": "1K\u20131.9K", "location": "Foster City, California", "customers": "5000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Irina Musteata", "title": "Director, Customer Success", "url": "https://www.linkedin.com/in/irina-musteata-710b3422/"}, {"name": "Tim Szego", "title": "Vice President of Global Customer Success", "url": "https://www.linkedin.com/in/timszego/"}, {"name": "Veronica Wynkoop", "title": "Head of Customer Success", "url": "https://www.linkedin.com/in/veronica-wynkoop-1426152b/"}, {"name": "Kim S.", "title": "Head of Customer Success, Americas", "url": "https://www.linkedin.com/in/kimsaggu/"}, {"name": "Agour Tzour", "title": "Head of Success", "url": "https://www.linkedin.com/in/agour-tzour/"}, {"name": "Scott Olsen", "title": "Head of Customer Marketing", "url": "https://www.linkedin.com/in/scottolsen49/"}]}, {"abm_ref": "Lemonade; Hippo Insurance", "name": "Root Insurance", "segment": "Insurance / Insurtech", "country": "USA", "website": "joinroot.com", "industry": "Insurance", "revenue": "1B-10B", "employees": "1180", "emp_bucket": "1K\u20131.9K", "location": "Columbus, Ohio", "customers": "414862.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Olu Roberts, AINS", "title": "Senior Director, Customer Experience", "url": "https://www.linkedin.com/in/olu-roberts-ains-b95847103/"}, {"name": "Jason Latham", "title": "Director, Business Development", "url": "https://www.linkedin.com/in/jason-latham-7471b47/"}, {"name": "Justin Buchanan, CPCU, CLU", "title": "Director, Customer Service Process & Operations", "url": "https://www.linkedin.com/in/justin-buchanan-371b9a8b/"}, {"name": "Jody Sims", "title": "Vice President Operations", "url": "https://www.linkedin.com/in/jody-sims-189529102/"}, {"name": "Mendy Paul", "title": "Head of Brand Partnerships", "url": "https://www.linkedin.com/in/mendyp/"}]}, {"abm_ref": "Headspace; ClassPass", "name": "Noom", "segment": "Health / Wellness / Fitness", "country": "USA", "website": "noom.com", "industry": "Wellness and Fitness Services", "revenue": "500M-1B", "employees": "1185", "emp_bucket": "1K\u20131.9K", "location": "New York, NY", "customers": "6500000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Miriam Wilder", "title": "Head of Customer Service Center of Excellence", "url": "https://www.linkedin.com/in/miriamwilder/"}, {"name": "Heidi Vahue", "title": "Director of CX Operations", "url": "https://www.linkedin.com/in/heidi-vahue-35b2a31b/"}, {"name": "Darryl Nixon, MBA", "title": "Director of Quality Assurance", "url": "https://www.linkedin.com/in/darryl-nixon-mba-a1b93b69/"}, {"name": "Karen Tongwarin", "title": "Head of Customer Success", "url": "https://www.linkedin.com/in/karen-tongwarin-83b6913/"}, {"name": "Sabrina Burgi", "title": "Chief Operating Officer", "url": "https://www.linkedin.com/in/sabrina-burgi/"}]}, {"abm_ref": "Substack", "name": "Patreon", "segment": "Creator / Newsletter", "country": "USA", "website": "patreon.com", "industry": "Technology, Information and Internet", "revenue": "500M-1B", "employees": "1194", "emp_bucket": "1K\u20131.9K", "location": "San Francisco, California", "customers": "10000000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Betsy McCormick", "title": "VP, Customer Success and Operations", "url": "https://www.linkedin.com/in/betsy-mccormick-214a343/"}, {"name": "Brian Perone", "title": "Human Factors Engineer", "url": "https://www.linkedin.com/in/bperone/"}, {"name": "Jake A.", "title": "Director, Product Support", "url": "https://www.linkedin.com/in/jake-a-b2100b83/"}, {"name": "Angela R.", "title": "Head of Customer Operations", "url": "https://www.linkedin.com/in/angelaraiford/"}, {"name": "Eric Clay", "title": "Senior Director, Support Experience", "url": "https://www.linkedin.com/in/erclay/"}]}, {"abm_ref": "Angi; Handy", "name": "Jobber", "segment": "Gig / Services Marketplace", "country": "Canada", "website": "getjobber.com", "industry": "Software Development", "revenue": "500M-1B", "employees": "1310", "emp_bucket": "1K\u20131.9K", "location": "Edmonton, Alberta", "customers": "200000.0", "tech": [], "zendesk": "Zendesk Chat, Zendesk", "executives": [{"name": "Elayne Ward", "title": "Vice President of Customer Experience", "url": "https://www.linkedin.com/in/elayneward/"}, {"name": "Diego von S\u00f6hsten", "title": "Director of Product, CX", "url": "https://www.linkedin.com/in/diego-vs/"}, {"name": "Ivanina Mincheva", "title": "Director, Customer Support and Enablement", "url": "https://www.linkedin.com/in/ivanina-mincheva-b4b37741/"}, {"name": "Julian Di Palma", "title": "Customer Success Operations Director", "url": "https://www.linkedin.com/in/julian-di-palma-8609a21a8/"}, {"name": "James Lowe", "title": "Director of Customer Success & Key Account Management", "url": "https://www.linkedin.com/in/jamesloweto/"}, {"name": "Justine Burns", "title": "Voice of Customer Program Director", "url": "https://www.linkedin.com/in/justine-burns-13490697/"}, {"name": "Nehashree .", "title": "Senior Director, Product Analytics & Data Science", "url": "https://www.linkedin.com/in/nehashree-08a25813/"}]}, {"abm_ref": "Handy; Angi", "name": "HouseCall Pro", "segment": "Gig / Services Marketplace", "country": "USA", "website": "housecallpro.com", "industry": "Software Development", "revenue": "500M-1B", "employees": "1466", "emp_bucket": "1K\u20131.9K", "location": "Denver, Colorado", "customers": "200000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Monica Timko", "title": "Director, Customer Success", "url": "https://www.linkedin.com/in/monicaebradley/"}, {"name": "Rachel Shull", "title": "Director, Customer Success", "url": "https://www.linkedin.com/in/rachelshull031/"}, {"name": "Sean Miller", "title": "Vice President of Customer Success", "url": "https://www.linkedin.com/in/seanmiller/"}, {"name": "Justin Sefrin", "title": "Vice President Enterprise", "url": "https://www.linkedin.com/in/justinsefrin/"}, {"name": "Alyssa Moretti", "title": "Senior Director, Customer Success", "url": "https://www.linkedin.com/in/alyssamoretti/"}, {"name": "Tierra Gindt", "title": "Senior Director, Customer Success", "url": "https://www.linkedin.com/in/tierra-gindt/"}, {"name": "Bridget Leiber", "title": "Sr. Director, Enablement", "url": "https://www.linkedin.com/in/bridget-leiber-42bb184/"}]}, {"abm_ref": "Mixpanel; Taboola", "name": "Contentsquare", "segment": "Data / Analytics / GTM", "country": "USA", "website": "contentsquare.com", "industry": "Software Development", "revenue": "200M-500M", "employees": "1684", "emp_bucket": "1K\u20131.9K", "location": "Paris", "customers": "1000.0", "tech": [], "zendesk": "Zendesk Support, Zendesk, Spendesk", "executives": [{"name": "Ziad Nakad", "title": "Founder & CEO", "url": "https://www.linkedin.com/in/ziad-nakad-9a89a516/"}, {"name": "Mathilde Soler", "title": "Head of Customer Success Enablement", "url": "https://www.linkedin.com/in/mathilde-soler/"}, {"name": "David Perrault", "title": "Senior Vice President, Customer Success & Services", "url": "https://www.linkedin.com/in/david-perrault-67ab15/"}, {"name": "James Teagle", "title": "Vice President of Customer Support", "url": "https://www.linkedin.com/in/james-teagle-9bb15125/"}, {"name": "Lane Hart", "title": "VP of Customer Success", "url": "https://www.linkedin.com/in/lane-hart-b663686/"}, {"name": "Kirsty Champion", "title": "Director of Customer Success", "url": "https://www.linkedin.com/in/kirsty-champion-64392264/"}]}, {"abm_ref": "Angi; TaskRabbit; Handy", "name": "Thumbtack", "segment": "Gig / Services Marketplace", "country": "USA", "website": "thumbtack.com", "industry": "Software Development", "revenue": "200M-500M", "employees": "1770", "emp_bucket": "1K\u20131.9K", "location": "San Francisco, California", "customers": "4000000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Nicholas Peck", "title": "Director, Customer Success and Professional Services", "url": "https://www.linkedin.com/in/nickpeck/"}, {"name": "James Hwang", "title": "Chief Operating Officer", "url": "https://www.linkedin.com/in/james-hwang88/"}, {"name": "Eleanore Fairchild", "title": "Director of CX Strategy and Support Services", "url": "https://www.linkedin.com/in/eleanore-fairchild-10b438154/"}, {"name": "Jordan Wiles", "title": "Director of CX Strategy and Support Services", "url": "https://www.linkedin.com/in/jordan-wiles-9037b6153/"}, {"name": "Dan Roby", "title": "Senior Director of Customer Success", "url": "https://www.linkedin.com/in/dan-roby-ba242746/"}, {"name": "Aaron Basinger, HPMT", "title": "Senior Director, Customer Support Center", "url": "https://www.linkedin.com/in/aaron-basinger-66893a3/"}, {"name": "Wendy Roberts", "title": "VP of Risk US A2A Payments and Open Banking", "url": "https://www.linkedin.com/in/wendy-j-roberts/"}]}, {"abm_ref": "Deel", "name": "Humi", "segment": "HR Tech / Workforce", "country": "Canada", "website": "humi.ca", "industry": "Human Resources Services", "revenue": "200M-500M", "employees": "1803", "emp_bucket": "1K\u20131.9K", "location": "Sydney, NSW", "customers": "300000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Siobhan Hitchmough", "title": "Director, Client Support Canada", "url": "https://www.linkedin.com/in/siobhan-hitchmough-b24a7020/"}, {"name": "Shelby Greer", "title": "Global Head of Customer Success", "url": "https://www.linkedin.com/in/shelby-greer-a61493120/"}, {"name": "Olivia Coletto", "title": "Director, Implementation (Canada)", "url": "https://www.linkedin.com/in/olivia-coletto-7a38a4118/"}, {"name": "Meg G.", "title": "Director, Global Customer Support", "url": "https://www.linkedin.com/in/meggallen/"}, {"name": "Dan Pooley", "title": "Non Executive Director", "url": "https://www.linkedin.com/in/danpooley/"}, {"name": "Jaime T.", "title": "Senior Director, APAC Head of Enterprise Customer Experience", "url": "https://www.linkedin.com/in/jaimetagle/"}, {"name": "Rebecca Illingworth", "title": "Head of Technology & Innovation - APJ", "url": "https://www.linkedin.com/in/rebeccaillingworth/"}, {"name": "Gabrielle D.", "title": "Head of Customer Solutions", "url": "https://www.linkedin.com/in/gabrielledrac/"}, {"name": "Jules Trunkfield", "title": "Business Executive - EVP Performance Marketing", "url": "https://www.linkedin.com/in/julietrunkfield/"}]}, {"abm_ref": "Binance; OKX", "name": "Gemini", "segment": "Crypto / Investment", "country": "USA", "website": "gemini.com", "industry": "Financial Services", "revenue": "1B-10B", "employees": "1825", "emp_bucket": "1K\u20131.9K", "location": "New York, NY", "customers": "340000.0", "tech": [], "zendesk": "Zendesk Support, Zendesk", "executives": [{"name": "Drew Candres", "title": "VP, Customer Experience", "url": "https://www.linkedin.com/in/andrewjcandres/"}, {"name": "Adam C.", "title": "Head of Customer Experience", "url": "https://www.linkedin.com/in/adam-c-1242aa53/"}, {"name": "Gardner L", "title": "Associate Director, Client Services", "url": "https://www.linkedin.com/in/gardner-l-5229a824/"}, {"name": "Kelly Yount", "title": "Head of Customer Experience", "url": "https://www.linkedin.com/in/kellyvergamini/"}, {"name": "Leonard Manning", "title": "Associate Director, Customer Experience", "url": "https://www.linkedin.com/in/leonard-manning-363347a8/"}, {"name": "Martha V.", "title": "Head of Operations", "url": "https://www.linkedin.com/in/martha-vokes-09a3331/"}, {"name": "Steven Gilligan, CFA, CMA, CRP", "title": "Head of Consumer Lending", "url": "https://www.linkedin.com/in/steven-gilligan/"}, {"name": "Claire Lovell", "title": "Head of Product", "url": "https://www.linkedin.com/in/claire-lovell-ba536431/"}]}, {"abm_ref": "Deel", "name": "BambooHR", "segment": "HR Tech / Workforce", "country": "USA", "website": "bamboohr.com", "industry": "Human Resources Services", "revenue": "200M-500M", "employees": "1840", "emp_bucket": "1K\u20131.9K", "location": "Draper, Utah", "customers": "34000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Gavin Klingonsmith", "title": "Director, CX Operations", "url": "https://www.linkedin.com/in/gavin-klingonsmith-4363389/"}, {"name": "Tammy Clayton", "title": "Director, CX Training & Enablement", "url": "https://www.linkedin.com/in/tammy-clayton-21744986/"}, {"name": "Robb Young", "title": "Director of Customer Support", "url": "https://www.linkedin.com/in/robbtyoung/"}, {"name": "Jessica Blair", "title": "Director, CX Digital Content and Insights", "url": "https://www.linkedin.com/in/jessica-blair-8b8b68a4/"}, {"name": "Ken Kirkland", "title": "Director of User Experience", "url": "https://www.linkedin.com/in/ken-kirkland-75981b9/"}, {"name": "Nicholas Peck", "title": "Director, Customer Success and Professional Services", "url": "https://www.linkedin.com/in/nickpeck/"}, {"name": "Cedric Bandoh", "title": "Senior Director, Capital & Business Operations", "url": "https://www.linkedin.com/in/cedricbandoh/"}, {"name": "Jocelyn Hall", "title": "VP Customer Enablement", "url": "https://www.linkedin.com/in/jocelynhall/"}, {"name": "Anna Swayne", "title": "Director of Product and Customer Marketing", "url": "https://www.linkedin.com/in/anna-swayne-836a5b149/"}]}, {"abm_ref": "Udemy", "name": "Pluralsight", "segment": "EdTech", "country": "USA", "website": "pluralsight.com", "industry": "E-Learning Providers", "revenue": "200M-500M", "employees": "1895", "emp_bucket": "1K\u20131.9K", "location": "Westlake, Texas", "customers": "17000.0", "tech": [], "zendesk": "Zendesk Guide, Zendesk", "executives": [{"name": "Andy Rahden", "title": "VP Solution Engineering & Services", "url": "https://www.linkedin.com/in/andyrahden/"}, {"name": "Jill T.", "title": "Senior Vice President Customer Success", "url": "https://www.linkedin.com/in/jilltucker/"}, {"name": "Gregory Schaentzler", "title": "Director of Client Services", "url": "https://www.linkedin.com/in/gregory-schaentzler-8310b316/"}, {"name": "Josh Sullivan", "title": "Director, Customer Success", "url": "https://www.linkedin.com/in/josh-sullivan-41a4217b/"}, {"name": "Courtney McCarthy", "title": "Customer Success Director", "url": "https://www.linkedin.com/in/courtmcc/"}, {"name": "Trevor Ralls", "title": "Vice President, Operations", "url": "https://www.linkedin.com/in/trevor-ralls-6532a713/"}]}, {"abm_ref": "ClassPass", "name": "Gympass", "segment": "Health / Wellness / Fitness", "country": "USA", "website": "gympass.com", "industry": "Wellness and Fitness Services", "revenue": "500M-1B", "employees": "1977", "emp_bucket": "1K\u20131.9K", "location": "New York, NY", "customers": "15000.0", "tech": [], "zendesk": "Zendesk Sell, Zendesk", "executives": [{"name": "Margaret D.", "title": "Account Director", "url": "https://www.linkedin.com/in/margaretdarias/"}, {"name": "Beth Everhart", "title": "Managing Director", "url": "https://www.linkedin.com/in/bethaeverhart/"}, {"name": "Michael Kol", "title": "Client Success Director", "url": "https://www.linkedin.com/in/michael-kol/"}, {"name": "Joshua Stidham", "title": "Head of Customer Strategy & Operations", "url": "https://www.linkedin.com/in/joshua-stidham-672a5440/"}]}, {"abm_ref": "N26; Revolut", "name": "Wealthsimple", "segment": "Neobank / Digital Banking", "country": "Canada", "website": "wealthsimple.com", "industry": "Financial Services", "revenue": "1B-10B", "employees": "1987", "emp_bucket": "1K\u20131.9K", "location": "Toronto, Ontario", "customers": "3000000.0", "tech": [], "zendesk": "Zendesk Guide, Zendesk Explore, Zendesk", "executives": [{"name": "Laura Lampe", "title": "VP, Customer Experience Operations", "url": "https://www.linkedin.com/in/laura-lampe-97067632/"}, {"name": "Shira Tsinman", "title": "Director, Customer Experience Operations", "url": "https://www.linkedin.com/in/shira-tsinman/"}, {"name": "Lauren Foster", "title": "Director, Customer Experience Operations", "url": "https://www.linkedin.com/in/laurenyfoster/"}, {"name": "Niki M.", "title": "Director, Client Experience Operations", "url": "https://www.linkedin.com/in/nikimarkulyn/"}, {"name": "Marsha Henderson", "title": "Director, Client Experience Operations", "url": "https://www.linkedin.com/in/marsha-henderson-7087021a/"}, {"name": "Simone Hern", "title": "Director of Product Management", "url": "https://www.linkedin.com/in/simonehern/"}]}, {"abm_ref": "Lyft; BlaBlaCar", "name": "Via", "segment": "Travel / Mobility / Transport", "country": "USA", "website": "ridewithvia.com", "industry": "Software Development", "revenue": "500M-1B", "employees": "2019", "emp_bucket": "2K\u20134.9K", "location": "New York, New York", "customers": "700.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Ori Singer", "title": "Head of B2B", "url": "https://www.linkedin.com/in/ori-singer-0a780211/"}, {"name": "Laurence Capdeville", "title": "VP Customer Success", "url": "https://www.linkedin.com/in/laurence-capdeville-ba6b6848/"}, {"name": "Ishai Ankri", "title": "CEO", "url": "https://www.linkedin.com/in/ishai-ankri-%f0%9f%87%ae%f0%9f%87%b1-24564041/"}, {"name": "Devon Shapiro", "title": "VP, City Performance", "url": "https://www.linkedin.com/in/devon-shapiro-19b3a83b/"}, {"name": "Jason Tilly", "title": "Vice President Operations", "url": "https://www.linkedin.com/in/jason-tilly-28672651/"}, {"name": "Michael Flaster", "title": "VP of Partner Engineering & Support Operations", "url": "https://www.linkedin.com/in/michael-flaster/"}]}, {"abm_ref": "Notion; Evernote", "name": "Guru", "segment": "SaaS / Productivity", "country": "USA", "website": "getguru.com", "industry": "Technology, Information and Internet", "revenue": "500M-1B", "employees": "2288", "emp_bucket": "2K\u20134.9K", "location": "Philadelphia, PA", "customers": "nan", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Diane Stern Ruth", "title": "VP, Global Partnerships", "url": "https://www.linkedin.com/in/diane-stern-ruth-3035a36/"}, {"name": "Hillary Curran", "title": "Senior Director, Customer Experience & AI Enablement", "url": "https://www.linkedin.com/in/hellohillary/"}]}, {"abm_ref": "Indeed; TaskRabbit", "name": "Instawork", "segment": "Gig / Services Marketplace", "country": "USA", "website": "instawork.com", "industry": "Technology, Information and Internet", "revenue": "500M-1B", "employees": "2300", "emp_bucket": "2K\u20134.9K", "location": "San Francisco, California", "customers": "8000000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Andie Morales", "title": "Vice President, Customer Experience & Operations", "url": "https://www.linkedin.com/in/andreinamorales/"}, {"name": "Samrudhi Nayak", "title": "Customer & Partner Experience Director", "url": "https://www.linkedin.com/in/samrudhi-nayak-5907b914/"}]}, {"abm_ref": "ClassPass; WHOOP", "name": "Peloton", "segment": "Health / Wellness / Fitness", "country": "USA", "website": "onepeloton.com", "industry": "Wellness and Fitness Services", "revenue": "1B-10B", "employees": "2981", "emp_bucket": "2K\u20134.9K", "location": "New York", "customers": "2661000.0", "tech": [], "zendesk": "Zendesk Support", "executives": [{"name": "John S.", "title": "Vice President, Mission Services", "url": "https://www.linkedin.com/in/john-simmons/"}, {"name": "Lawson Ho", "title": "Corporate Vice President of Platform & AI Experience", "url": "https://www.linkedin.com/in/lawson-ho-a4a638192/"}, {"name": "Oliver Snoddy", "title": "CMO", "url": "https://www.linkedin.com/in/oliversnoddy/"}, {"name": "Mike Babbar", "title": "Head of NA/EU Operations - Trade-In & Pre-Owned Business/CX, Product/Ops - BizOps, Supply Chain", "url": "https://www.linkedin.com/in/mikebabbar/"}, {"name": "Sarah Rodenberg", "title": "Director of B2B Customer Experience & Business Transformation", "url": "https://www.linkedin.com/in/sarah-rodenberg-59620328/"}, {"name": "Bob Brown", "title": "Senior Director Quality, Customer Experience and Product Compliance", "url": "https://www.linkedin.com/in/bob-brown-14218643/"}]}, {"abm_ref": "Wise; Thunes", "name": "Payoneer", "segment": "Fintech / Payments", "country": "USA", "website": "payoneer.com", "industry": "Financial Services", "revenue": "500M-1B", "employees": "3137", "emp_bucket": "2K\u20134.9K", "location": "New York, NY", "customers": "536000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Yael R.", "title": "Director of Clinical Informatics", "url": "https://www.linkedin.com/in/yael-redelman/"}, {"name": "Robert Sandrasagara", "title": "Senior Director, Managed Accounts - North America & EMEA", "url": "https://www.linkedin.com/in/rsandrasagara/"}, {"name": "Sofya Romanenko", "title": "Client Growth Director", "url": "https://www.linkedin.com/in/sofya-romanenko-46882a4a/"}, {"name": "Ilene Molina-Han", "title": "Director, Relationship Manager", "url": "https://www.linkedin.com/in/ilene-molina-han/"}, {"name": "Nicole Neiman", "title": "Central Community Coordinator, Team Lead", "url": "https://www.linkedin.com/in/nicoleneiman/"}]}, {"abm_ref": "Airbnb; Blueground", "name": "TripActions", "segment": "Travel / Mobility / Transport", "country": "USA", "website": "tripactions.com", "industry": "Software Development", "revenue": "200M-500M", "employees": "3318", "emp_bucket": "2K\u20134.9K", "location": "Palo Alto, California", "customers": "10000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Andy Carrick", "title": "Strategic Account Director", "url": "https://www.linkedin.com/in/andy-carrick-5a020850/"}, {"name": "Will Alexander", "title": "Head of Account Management & AI Transformation", "url": "https://www.linkedin.com/in/will-alexander-47a81067/"}]}, {"abm_ref": "Toast; SpotOn", "name": "Lightspeed", "segment": "Fintech SMB / Restaurant Tech", "country": "Canada", "website": "lightspeedhq.com", "industry": "Software Development", "revenue": "500M-1B", "employees": "3469", "emp_bucket": "2K\u20134.9K", "location": "Montreal, Quebec", "customers": "145000.0", "tech": [], "zendesk": "Zendesk Support, Zendesk Explore, Zendesk Guide, Zendesk", "executives": [{"name": "Aur\u00e9lia Dagan", "title": "Head of Patient Experience", "url": "https://www.linkedin.com/in/aur%c3%a9lia-dagan-85358027/"}, {"name": "Chris Chimenti", "title": "Director, Customer Success", "url": "https://www.linkedin.com/in/chrischimenti/"}, {"name": "Phil Mueller", "title": "VP Customer Experience, Retail", "url": "https://www.linkedin.com/in/phil-mueller-3508861/"}, {"name": "Arek Saiyan", "title": "Director, Scaled Success & Account Management", "url": "https://www.linkedin.com/in/areksaiyan/"}]}, {"abm_ref": "Udemy", "name": "Wyzant", "segment": "EdTech", "country": "USA", "website": "wyzant.com", "industry": "Technology, Information and Internet", "revenue": "500M-1B", "employees": "3667", "emp_bucket": "2K\u20134.9K", "location": "Chicago, IL", "customers": "3000000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Erika Warren", "title": "Co-Founder & CEO", "url": "https://www.linkedin.com/in/erika-warren/"}, {"name": "Laura R.", "title": "Director of Customer Experience", "url": "https://www.linkedin.com/in/laura-r-27468a94/"}]}, {"abm_ref": "Poshmark; Mercari", "name": "Depop", "segment": "Marketplace / eCommerce", "country": "USA", "website": "depop.com", "industry": "Software Development", "revenue": "200M-500M", "employees": "4039", "emp_bucket": "2K\u20134.9K", "location": "London, England", "customers": "7000000.0", "tech": [], "zendesk": "Spendesk, Zendesk", "executives": [{"name": "Haley O'Sullivan", "title": "Vice President Customer Experience", "url": "https://www.linkedin.com/in/haley-o-sullivan-092705105/"}, {"name": "Anna Gradil", "title": "Senior Director, Sellers & CX", "url": "https://www.linkedin.com/in/anna-gradil-5301b3b/"}, {"name": "Chidi Onwudike", "title": "Chief Operating Officer", "url": "https://www.linkedin.com/in/conwudike/"}, {"name": "Giuseppe De Moj\u00e0", "title": "Head of Engineering - Platform", "url": "https://www.linkedin.com/in/giuseppe-de-moj%c3%a0-53269563/"}, {"name": "James Loach", "title": "Head of Operational Excellence", "url": "https://www.linkedin.com/in/jloach/"}, {"name": "Nelissa Ishmael-Georges", "title": "Global Director - Customer Engagement & Retention (Interim)", "url": "https://www.linkedin.com/in/nelissa-ishmael-georges-7632ab27/"}]}, {"abm_ref": "Deel", "name": "Gusto", "segment": "HR Tech / Workforce", "country": "USA", "website": "gusto.com", "industry": "Software Development", "revenue": "500M-1B", "employees": "4355", "emp_bucket": "2K\u20134.9K", "location": "San Francisco, California", "customers": "400000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Lauren Humphrey", "title": "Co-Founder & CEO", "url": "https://www.linkedin.com/in/lauren-humphrey-b929673/"}, {"name": "Eula Way", "title": "Senior Director HRBPs; GTM & CX", "url": "https://www.linkedin.com/in/eula-way/"}, {"name": "Michelle Cordray (Stoner) (she/her/hers)", "title": "Head of CX Recruiting", "url": "https://www.linkedin.com/in/michellenstoner/"}, {"name": "Jasmine Motupalli", "title": "Founder & CEO", "url": "https://www.linkedin.com/in/jasmine-motupalli/"}, {"name": "Miya Kusumoto", "title": "VP - Operations Analytics", "url": "https://www.linkedin.com/in/miya-kusumoto-35923b60/"}, {"name": "Aparna Singh", "title": "Head of Product, CX Platform", "url": "https://www.linkedin.com/in/axsingh/"}]}, {"abm_ref": "Nextdoor; Bumble", "name": "Discord", "segment": "Social / Community", "country": "USA", "website": "discord.com", "industry": "Software Development", "revenue": "500M-1B", "employees": "4399", "emp_bucket": "2K\u20134.9K", "location": "San Francisco, CA", "customers": "200000000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "In\u00e8s D.", "title": "Head of EMEA CX", "url": "https://www.linkedin.com/in/inesdesousaleite/"}, {"name": "Danny D.", "title": "Senior Director, Customer Experience", "url": "https://www.linkedin.com/in/dduongdd/"}, {"name": "Erica Mapa", "title": "Senior Vice President, Brand", "url": "https://www.linkedin.com/in/erica-mapa-758a217/"}, {"name": "Tomer Dekel", "title": "Director of Consumer Data Science & Analytics", "url": "https://www.linkedin.com/in/tomer-dekel-47733914/"}, {"name": "Chas Jhin", "title": "Director, Engineering (Client & Performance)", "url": "https://www.linkedin.com/in/chas-jhin/"}]}, {"abm_ref": "Udemy", "name": "Coursera", "segment": "EdTech", "country": "USA", "website": "coursera.org", "industry": "E-Learning Providers", "revenue": "500K-1M", "employees": "6356", "emp_bucket": "5K+", "location": "Mountain View, CA", "customers": "197000000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Andrea Godwin", "title": "Senior Director, Enterprise Partnerships", "url": "https://www.linkedin.com/in/andrea-godwin-b58b4b5/"}, {"name": "Danielle Silverstin", "title": "Enterprise Alliances Director", "url": "https://www.linkedin.com/in/danielle-silverstin-05339220/"}, {"name": "Andrew Engelbert", "title": "Customer Success Director", "url": "https://www.linkedin.com/in/andrew-engelbert-ca-cia-a7739222/"}, {"name": "Sarah Moshel", "title": "Customer Success Director", "url": "https://www.linkedin.com/in/sarah-moshel-277b8022/"}, {"name": "Anna Lindahl", "title": "Director of Customer Success", "url": "https://www.linkedin.com/in/lindahlanna/"}, {"name": "Bibin Shivas", "title": "Vice President Operations", "url": "https://www.linkedin.com/in/bibin-shivas-6367ab/"}, {"name": "Eman Absia", "title": "Senior Director, Customer Success - Enterprise", "url": "https://www.linkedin.com/in/eman-absia/"}, {"name": "Lea Crawford", "title": "Global Head of Scaled CX", "url": "https://www.linkedin.com/in/leacrawford/"}, {"name": "Sam McGowan", "title": "VP Consumer", "url": "https://www.linkedin.com/in/sam-mcgowan-17875a/"}]}, {"abm_ref": "Deel", "name": "Rippling", "segment": "HR Tech / Workforce", "country": "USA", "website": "rippling.com", "industry": "Software Development", "revenue": "1B-10B", "employees": "7133", "emp_bucket": "5K+", "location": "San Francisco, California", "customers": "20000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Hitendra Katiyar", "title": "VP Operations", "url": "https://www.linkedin.com/in/hitendra-katiyar-80341031/"}, {"name": "Husam Najib", "title": "Vice President, Customer Support", "url": "https://www.linkedin.com/in/husam-najib-b8601716/"}, {"name": "Madhu Nambiar", "title": "Director- Customer Support", "url": "https://www.linkedin.com/in/madhunambiar/"}, {"name": "Jared Sklar", "title": "Director, Customer Support - Global Payroll", "url": "https://www.linkedin.com/in/jared-sklar/"}, {"name": "Stephanie Ho", "title": "SVP, Customer Experience", "url": "https://www.linkedin.com/in/stephanie-ho-0b86a21/"}, {"name": "Katy Preston", "title": "Associate Director, Business Planning & Strategy", "url": "https://www.linkedin.com/in/katy-preston-960844b/"}, {"name": "Latha Girish", "title": "Director, Support Operations", "url": "https://www.linkedin.com/in/latha-girish-4759376/"}, {"name": "Marina Gu", "title": "Global VP, Customer Success", "url": "https://www.linkedin.com/in/marina-irgon-gu/"}, {"name": "Emmy Quinn", "title": "Head of Customer Marketing", "url": "https://www.linkedin.com/in/emmy-quinn/"}, {"name": "Jessica Hardy", "title": "Director of Client Engagement", "url": "https://www.linkedin.com/in/jessica-hardy-86240214a/"}]}, {"abm_ref": "Binance; OKX", "name": "Coinbase", "segment": "Crypto / Investment", "country": "USA", "website": "coinbase.com", "industry": "Financial Services", "revenue": "1B-10B", "employees": "7457", "emp_bucket": "5K+", "location": "Remote First", "customers": "971000.0", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "V W.", "title": "Head - YouTube Consumer Support (TV/NFL/YTMP)", "url": "https://www.linkedin.com/in/venkatwuppuluru/"}, {"name": "Jose del Corral", "title": "Vice President Customer Experience", "url": "https://www.linkedin.com/in/josedelcorral/"}, {"name": "Katsushige Yamagishi", "title": "Operations Director", "url": "https://www.linkedin.com/in/katsushige-yamagishi-879b096/"}, {"name": "Johan Wong", "title": "Director, Service Strategy & Operations, TikTok LIVE", "url": "https://www.linkedin.com/in/johanwong/"}, {"name": "Eric R.", "title": "Director - CX Operations PH", "url": "https://www.linkedin.com/in/eric-r-137a14121/"}, {"name": "Rochelle Delavega", "title": "Senior Director, Operations", "url": "https://www.linkedin.com/in/rochelle-delavega-6444a2125/"}]}, {"abm_ref": "Deel", "name": "Remote", "segment": "HR Tech / Workforce", "country": "USA", "website": "remote.com", "industry": "Human Resources Services", "revenue": "1B-10B", "employees": "14297", "emp_bucket": "5K+", "location": "San Francisco, CA", "customers": "nan", "tech": [], "zendesk": "Zendesk", "executives": []}, {"abm_ref": "Duolingo", "name": "Preply", "segment": "EdTech", "country": "USA", "website": "preply.com", "industry": "Technology, Information and Internet", "revenue": "1B-10B", "employees": "16250", "emp_bucket": "5K+", "location": "Brookline, Massachusetts", "customers": "nan", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Francine Pinto", "title": "VP - Customer Experience (Supply Operations, Customer Support, Trust & Safety)", "url": "https://www.linkedin.com/in/francine-pinto-758853202/"}, {"name": "Jean-Pascal Gribaudi", "title": "Director of Operations", "url": "https://www.linkedin.com/in/jean-pascal-gribaudi/"}, {"name": "Jessie Cohen", "title": "Director of Customer Success", "url": "https://www.linkedin.com/in/jessie-cohen/"}, {"name": "Elitsa Zaimova", "title": "Sales Director", "url": "https://www.linkedin.com/in/elitsa-zaimova-a238a31a/"}, {"name": "Elitsa Zaimova - Miller", "title": "VP of Sales", "url": "https://www.linkedin.com/in/elitsa-zaimova-miller-a238a31a/"}, {"name": "Ricardo Correa B.", "title": "Director of Customer Care", "url": "https://www.linkedin.com/in/ricardocorreab/"}, {"name": "Veronica Ivanova", "title": "Director of Account Management", "url": "https://www.linkedin.com/in/veronica-ivnv/"}, {"name": "Anita Sathyamurthy", "title": "VP - Client Success", "url": "https://www.linkedin.com/in/anita-sathyamurthy-39ba315/"}]}, {"abm_ref": "Instacart; Shipt", "name": "Voil\u00e0", "segment": "Food / Grocery Delivery", "country": "Canada", "website": "voila.ca", "industry": "Retail", "revenue": "1B-10B", "employees": "17334", "emp_bucket": "5K+", "location": "Stellarton, Nova Scotia", "customers": "nan", "tech": [], "zendesk": "Zendesk", "executives": [{"name": "Behina Bahramsari", "title": "Youth STEM & Activity Program Instructor", "url": "https://www.linkedin.com/in/behina-bahramsary-a149b0bb/"}, {"name": "Melissa Lee", "title": "Director Sales, West", "url": "https://www.linkedin.com/in/melissa-lee-72b38a106/"}, {"name": "Sue Muirhead", "title": "Director Store Support & Customer Care", "url": "https://www.linkedin.com/in/sue-muirhead-65490b60/"}, {"name": "Suzanne Gagnon", "title": "National Director, Customer Experience", "url": "https://www.linkedin.com/in/suzanne-gagnon-07393629/"}, {"name": "Anna Spano", "title": "Director, Business Development  - Harvest Fresh", "url": "https://www.linkedin.com/in/anna-spano-a8322031/"}, {"name": "Mathieu Lacoursiere", "title": "Vice President, ERP Transformation", "url": "https://www.linkedin.com/in/mathieu-lacoursiere-a9140732/"}, {"name": "Jedd Wood, CPA, CA", "title": "Vice President Growth & Strategy", "url": "https://www.linkedin.com/in/jedd-wood-cpa-ca-727a6a42/"}]}, {"abm_ref": "Zillow; Redfin", "name": "Compass", "segment": "Proptech / Real Estate", "country": "USA", "website": "compass.com", "industry": "Real Estate", "revenue": "1B-10B", "employees": "34498", "emp_bucket": "5K+", "location": "New York, NY", "customers": "116000.0", "tech": [], "zendesk": "Zendesk Explore, Zendesk", "executives": [{"name": "Amy Velligan", "title": "Head of Customer Service", "url": "https://www.linkedin.com/in/amy-velligan-21464b39/"}, {"name": "Walker Hunt", "title": "Chief Operating Officer", "url": "https://www.linkedin.com/in/walker-hunt-80357a57/"}, {"name": "Pierson Mook", "title": "Director Of Client Relations", "url": "https://www.linkedin.com/in/pierson-mook-136751211/"}, {"name": "Mari Maurille", "title": "Director of Operations & Client Experience", "url": "https://www.linkedin.com/in/gelimaurille/"}, {"name": "Kristofer Gaines", "title": "Director of Client Growth and Retention", "url": "https://www.linkedin.com/in/kristofer-gaines-32249a35/"}, {"name": "Dave McCormick", "title": "Vice President - Product, Experience Design & Marketing", "url": "https://www.linkedin.com/in/dave-mccormick-5baba5/"}]}];
+
+// ── PALETTE ──────────────────────────────────────────────────────────
+const PAL = ['#0d4f6c','#0d7a5f','#1a7fbf','#16a34a','#7c3aed','#dc2626','#d97706','#0891b2','#9333ea','#c2410c','#065f46','#1e40af','#be185d','#78350f','#4338ca','#b45309','#166534','#9f1239','#1e3a5f','#064e3b'];
+const C = i => PAL[i % PAL.length];
+
+// ── UTILS ─────────────────────────────────────────────────────────────
+const countBy = (arr,fn) => arr.reduce((m,x)=>{const k=fn(x);m[k]=(m[k]||0)+1;return m},{});
+const sortDesc = obj => Object.entries(obj).sort((a,b)=>b[1]-a[1]);
+
+// ── DRILL STATE ───────────────────────────────────────────────────────
+let drillData = []; // array of {company, executives[]}
+
+function openDrill(title, companies) {
+  drillData = companies.map(c => ({company:c, executives:c.executives}));
+  document.getElementById('drill-title').textContent = title;
+  document.getElementById('drill-subtitle').textContent =
+    companies.length + ' companies · ' + companies.reduce((s,c)=>s+c.executives.length,0) + ' executives';
+  
+  const body = document.getElementById('drill-body');
+  body.innerHTML = companies.map(c => {
+    const exRows = c.executives.map(e => `
+      <div class="exec-row">
+        <span class="exec-name">${e.name}</span>
+        <span class="exec-title">${e.title || '—'}</span>
+        <span class="exec-li">${e.url ? `<a href="${e.url}" target="_blank">LinkedIn →</a>` : ''}</span>
+      </div>`).join('');
+    const id = 'co-'+c.name.replace(/\W/g,'_');
+    return `
+      <div class="co-block">
+        <div class="co-header" onclick="toggleCo('${id}',this)" id="hd-${id}">
+          <span class="co-arrow">▶</span>
+          <span class="co-name">${c.name}</span>
+          <span class="co-meta">${c.segment}</span>
+          <span class="co-count">${c.executives.length} execs</span>
+        </div>
+        <div class="co-execs" id="${id}">${exRows}</div>
+      </div>`;
+  }).join('');
+  
+  document.getElementById('drill').classList.add('open');
+}
+
+function toggleCo(id, hd) {
+  const el = document.getElementById(id);
+  const open = el.classList.contains('open');
+  el.classList.toggle('open', !open);
+  hd.classList.toggle('expanded', !open);
+}
+
+function closeDrill() { document.getElementById('drill').classList.remove('open'); }
+
+function exportDrill() {
+  const rows = [['Company','Segment','Revenue','Country','Executive Name','Title','LinkedIn']];
+  drillData.forEach(({company:c, executives:exs}) => {
+    if(exs.length === 0) rows.push([c.name,c.segment,c.revenue,c.country,'','','']);
+    else exs.forEach(e => rows.push([c.name,c.segment,c.revenue,c.country,e.name,e.title,e.url]));
+  });
+  dlCSV(rows, 'birdie_executives_filtered.csv');
+}
+
+// ── CHARTS ────────────────────────────────────────────────────────────
+let charts = {};
+function mkChart(id, type, labels, data, clickFn) {
+  if(charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id);
+  if(!ctx) return;
+  const bgs = labels.map((_,i)=>C(i));
+  charts[id] = new Chart(ctx, {
+    type,
+    data: {labels, datasets:[{data, backgroundColor:bgs, borderColor:bgs.map(c=>c+'cc'), borderWidth:type==='bar'?0:2, borderRadius:type==='bar'?5:0, hoverOffset:6}]},
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:type!=='bar',position:'right',labels:{font:{size:10},boxWidth:11,padding:7}},
+               tooltip:{callbacks:{label:c=>` ${c.label||''}: ${c.raw}`}}},
+      scales: type==='bar' ? {x:{ticks:{font:{size:9},maxRotation:35}},y:{ticks:{font:{size:10}},grid:{color:'#f0f4f8'}}} : {},
+      onClick: clickFn ? (evt,els)=>{ if(els.length) clickFn(labels[els[0].index], data[els[0].index]); } : null,
+      cursor: clickFn ? 'pointer' : 'default',
+    }
+  });
+}
+
+function mkGroupedBar(id, labels, datasets) {
+  if(charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id);
+  if(!ctx) return;
+  charts[id] = new Chart(ctx, {
+    type:'bar',
+    data:{labels, datasets},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:true,labels:{font:{size:10},boxWidth:11}}},
+      scales:{x:{ticks:{font:{size:9},maxRotation:30}},y:{ticks:{font:{size:10}},grid:{color:'#f0f4f8'}}}}
+  });
+}
+
+// ── DRILL HELPERS ─────────────────────────────────────────────────────
+function drillByField(field, value) {
+  const cos = DATA.filter(d => d[field] === value);
+  openDrill(`${field}: ${value}`, cos);
+}
+
+function drillByEmpBucket(bucket) {
+  const cos = DATA.filter(d => d.emp_bucket === bucket);
+  openDrill(`Employees: ${bucket}`, cos);
+}
+
+function drillByRevenue(rev) {
+  const cos = DATA.filter(d => d.revenue === rev);
+  openDrill(`Revenue: ${rev}`, cos);
+}
+
+function drillByCity(city) {
+  const cos = DATA.filter(d => (d.location.split(',')[0].trim() || 'Unknown') === city);
+  openDrill(`City: ${city}`, cos);
+}
+
+function drillByIndustry(ind) {
+  // partial match since we truncated labels
+  const cos = DATA.filter(d => d.industry.includes(ind.replace('…','')));
+  openDrill(`Industry: ${ind}`, cos);
+}
+
+// ── BUILD CHARTS ──────────────────────────────────────────────────────
+function buildCharts() {
+  // Overview
+  const segC = countBy(DATA, d=>d.segment);
+  const segE = sortDesc(segC);
+  mkChart('ch-seg','doughnut',segE.map(e=>e[0]),segE.map(e=>e[1]),
+    (lbl)=>drillByField('segment',lbl));
+
+  const REV_ORDER = ['<10M','10M-75M','75M-200M','200M-500M','500M-1B','1B-10B','10B+'];
+  const revC = countBy(DATA, d=>d.revenue);
+  const revE = REV_ORDER.filter(k=>revC[k]).map(k=>[k,revC[k]]);
+  mkChart('ch-rev','doughnut',revE.map(e=>e[0]),revE.map(e=>e[1]),
+    (lbl)=>drillByRevenue(lbl));
+
+  const EMP_ORDER = ['<500','500–999','1K–1.9K','2K–4.9K','5K+'];
+  const empC = countBy(DATA, d=>d.emp_bucket);
+  const empE = EMP_ORDER.filter(k=>empC[k]).map(k=>[k,empC[k]]);
+  mkChart('ch-emp','bar',empE.map(e=>e[0]),empE.map(e=>e[1]),
+    (lbl)=>drillByEmpBucket(lbl));
+
+  const ctrC = countBy(DATA, d=>d.country);
+  const ctrE = sortDesc(ctrC);
+  mkChart('ch-ctr','doughnut',ctrE.map(e=>e[0]),ctrE.map(e=>e[1]),
+    (lbl)=>drillByField('country',lbl));
+
+  // Segments page
+  mkChart('ch-seg2','bar',segE.map(e=>e[0]),segE.map(e=>e[1]),
+    (lbl)=>drillByField('segment',lbl));
+
+  const segExecAvg = segE.map(([s])=>+((DATA.filter(d=>d.segment===s).reduce((a,d)=>a+d.executives.length,0)) / segC[s]).toFixed(1));
+  mkChart('ch-seg-exec','bar',segE.map(e=>e[0]),segExecAvg,
+    (lbl)=>drillByField('segment',lbl));
+
+  const RS = {'<10M':1,'10M-75M':2,'75M-200M':3,'200M-500M':4,'500M-1B':5,'1B-10B':6,'10B+':7};
+  const segRevAvg = segE.map(([s])=>{
+    const cos=DATA.filter(d=>d.segment===s);
+    return +(cos.reduce((a,d)=>a+(RS[d.revenue]||0),0)/cos.length).toFixed(2);
+  });
+  mkChart('ch-seg-rev','bar',segE.map(e=>e[0]),segRevAvg);
+
+  // Firmographics
+  mkChart('ch-firm-rev','doughnut',revE.map(e=>e[0]),revE.map(e=>e[1]),
+    (lbl)=>drillByRevenue(lbl));
+  mkChart('ch-firm-emp','doughnut',empE.map(e=>e[0]),empE.map(e=>e[1]),
+    (lbl)=>drillByEmpBucket(lbl));
+  const indC = countBy(DATA, d=>d.industry);
+  const indE = sortDesc(indC).slice(0,8);
+  mkChart('ch-firm-ind','bar',
+    indE.map(e=>e[0].length>38?e[0].slice(0,36)+'…':e[0]),
+    indE.map(e=>e[1]),
+    (lbl)=>drillByIndustry(lbl));
+
+  // Geography
+  mkChart('ch-geo-ctr','doughnut',ctrE.map(e=>e[0]),ctrE.map(e=>e[1]),
+    (lbl)=>drillByField('country',lbl));
+  const cityC = countBy(DATA, d=>d.location.split(',')[0].trim()||'Unknown');
+  const cityE = sortDesc(cityC).slice(0,12);
+  mkChart('ch-geo-city','bar',cityE.map(e=>e[0]),cityE.map(e=>e[1]),
+    (lbl)=>drillByCity(lbl));
+  const allSegs = segE.map(e=>e[0]).slice(0,9);
+  mkGroupedBar('ch-geo-seg',
+    allSegs.map(s=>s.length>20?s.slice(0,18)+'…':s),
+    [{label:'USA',data:allSegs.map(s=>DATA.filter(d=>d.segment===s&&d.country==='USA').length),backgroundColor:'#0d4f6c',borderRadius:4},
+     {label:'Canada',data:allSegs.map(s=>DATA.filter(d=>d.segment===s&&d.country==='Canada').length),backgroundColor:'#0d7a5f',borderRadius:4}]);
+}
+
+// ── COMPANIES + EXECS VIEW ────────────────────────────────────────────
+let filteredCos = [...DATA];
+let coPage = 1;
+const CO_PP = 12;
+
+function renderCoCards() {
+  const q = document.getElementById('co-q').value.toLowerCase();
+  const seg = document.getElementById('co-seg').value;
+  const rev = document.getElementById('co-rev').value;
+  filteredCos = DATA.filter(d =>
+    (!q || d.name.toLowerCase().includes(q) || d.segment.toLowerCase().includes(q) || d.abm_ref.toLowerCase().includes(q) ||
+           d.executives.some(e=>e.name.toLowerCase().includes(q)||e.title.toLowerCase().includes(q))) &&
+    (!seg || d.segment===seg) && (!rev || d.revenue===rev));
+  coPage = 1;
+  renderCosPage();
+}
+
+function renderCosPage() {
+  const start = (coPage-1)*CO_PP;
+  const page = filteredCos.slice(start, start+CO_PP);
+  document.getElementById('co-cards').innerHTML = page.map(c => {
+    const previewExecs = c.executives.slice(0,4).map(e=>`
+      <div><span class="en">${e.name}</span> <span class="et">— ${e.title||'—'}</span></div>`).join('');
+    const more = c.executives.length > 4 ? `<div class="more">+${c.executives.length-4} more executives</div>` : '';
+    return `<div class="co-card" onclick="openModal('${c.name.replace(/'/g,"\\'")}')">
+      <div class="cn">${c.name} <span style="font-size:10px;color:#9ab;font-weight:400">↗ ${c.website}</span></div>
+      <div class="cs">${c.segment} · ${c.country} · ${c.revenue} · ${c.employees} employees</div>
+      <div class="ce">${previewExecs}${more}</div>
+    </div>`;
+  }).join('');
+  renderCoPager();
+}
+
+function renderCoPager() {
+  const total = Math.ceil(filteredCos.length/CO_PP);
+  if(total<=1){document.getElementById('co-pager').innerHTML='';return;}
+  let h=`<div class="pager"><button class="pg" onclick="coGo(${coPage-1})" ${coPage===1?'disabled':''}>‹</button>`;
+  for(let i=1;i<=total;i++) h+=`<button class="pg ${i===coPage?'on':''}" onclick="coGo(${i})">${i}</button>`;
+  h+=`<button class="pg" onclick="coGo(${coPage+1})" ${coPage===total?'disabled':''}>›</button><span class="pg-info">${filteredCos.length} companies</span></div>`;
+  document.getElementById('co-pager').innerHTML=h;
+}
+function coGo(p){const t=Math.ceil(filteredCos.length/CO_PP);if(p<1||p>t)return;coPage=p;renderCosPage();}
+
+function exportFilteredCos() {
+  const rows=[['Company','Segment','Country','Revenue','Employees','Website','ABM Ref','Executive Name','Title','LinkedIn']];
+  filteredCos.forEach(c=>{
+    if(c.executives.length===0) rows.push([c.name,c.segment,c.country,c.revenue,c.employees,c.website,c.abm_ref,'','','']);
+    else c.executives.forEach(e=>rows.push([c.name,c.segment,c.country,c.revenue,c.employees,c.website,c.abm_ref,e.name,e.title,e.url]));
+  });
+  dlCSV(rows,'birdie_companies_executives.csv');
+}
+
+// ── ALL EXECUTIVES ────────────────────────────────────────────────────
+let allExecs = [];
+let filtExecs = [];
+let exPage = 1;
+const EX_PP = 30;
+
+function buildExecs() {
+  allExecs = [];
+  DATA.forEach(c=>c.executives.forEach(e=>allExecs.push({...e,company:c.name,segment:c.segment,revenue:c.revenue,country:c.country})));
+  filtExecs = [...allExecs];
+}
+
+function filterExecs() {
+  const q = document.getElementById('ex-q').value.toLowerCase();
+  const seg = document.getElementById('ex-seg').value;
+  filtExecs = allExecs.filter(e =>
+    (!q||e.name.toLowerCase().includes(q)||e.title.toLowerCase().includes(q)||e.company.toLowerCase().includes(q)) &&
+    (!seg||e.segment===seg));
+  exPage=1; renderExecsPage();
+}
+
+function renderExecsPage() {
+  const start=(exPage-1)*EX_PP;
+  const page=filtExecs.slice(start,start+EX_PP);
+  document.getElementById('ex-tbody').innerHTML=page.map(e=>`
+    <tr onclick="openModal('${e.company.replace(/'/g,"\\'")}')">
+      <td><strong>${e.name}</strong></td>
+      <td>${e.title||'—'}</td>
+      <td><span class="tag">${e.company}</span></td>
+      <td><span class="tag g">${e.segment}</span></td>
+      <td>${e.revenue}</td>
+      <td>${e.url?`<a href="${e.url}" target="_blank" onclick="event.stopPropagation()">LinkedIn →</a>`:'—'}</td>
+    </tr>`).join('');
+  renderExPager();
+}
+
+function renderExPager() {
+  const total=Math.ceil(filtExecs.length/EX_PP);
+  if(total<=1){document.getElementById('ex-pager').innerHTML='';return;}
+  let h=`<div class="pager"><button class="pg" onclick="exGo(${exPage-1})" ${exPage===1?'disabled':''}>‹</button>`;
+  for(let i=1;i<=total;i++) h+=`<button class="pg ${i===exPage?'on':''}" onclick="exGo(${i})">${i}</button>`;
+  h+=`<button class="pg" onclick="exGo(${exPage+1})" ${exPage===total?'disabled':''}>›</button><span class="pg-info">${filtExecs.length} executives</span></div>`;
+  document.getElementById('ex-pager').innerHTML=h;
+}
+function exGo(p){const t=Math.ceil(filtExecs.length/EX_PP);if(p<1||p>t)return;exPage=p;renderExecsPage();}
+
+function exportExecsFiltered() {
+  const rows=[['Name','Title','Company','Segment','Revenue','Country','LinkedIn']];
+  filtExecs.forEach(e=>rows.push([e.name,e.title,e.company,e.segment,e.revenue,e.country,e.url]));
+  dlCSV(rows,'birdie_executives.csv');
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────
+function openModal(name) {
+  const d = DATA.find(x=>x.name===name);
+  if(!d) return;
+  document.getElementById('m-title').textContent = d.name;
+  document.getElementById('m-sub').textContent = d.website+' · '+d.segment+' · '+d.country;
+  const techPills = d.tech.length ? d.tech.map(t=>`<span class="tech-pill">${t}</span>`).join('') : '<span style="color:#9aa">—</span>';
+  const execRows = d.executives.map(e=>`<tr><td><strong>${e.name}</strong></td><td>${e.title||'—'}</td><td>${e.url?`<a href="${e.url}" target="_blank">LinkedIn →</a>`:'—'}</td></tr>`).join('');
+  document.getElementById('modal-bd').innerHTML=`
+    <div class="m-grid">
+      <div class="mf"><div class="ml">ABM Reference</div><div class="mv">${d.abm_ref}</div></div>
+      <div class="mf"><div class="ml">Industry</div><div class="mv">${d.industry}</div></div>
+      <div class="mf"><div class="ml">Annual Revenue</div><div class="mv">${d.revenue}</div></div>
+      <div class="mf"><div class="ml">Employees</div><div class="mv">${d.employees}</div></div>
+      <div class="mf"><div class="ml">Location</div><div class="mv">${d.location}</div></div>
+      <div class="mf"><div class="ml">Customer Count</div><div class="mv">${d.customers?Number(d.customers).toLocaleString():'—'}</div></div>
+      <div class="mf"><div class="ml">Zendesk</div><div class="mv">${d.zendesk}</div></div>
+      <div class="mf"><div class="ml">Country</div><div class="mv">${d.country}</div></div>
+    </div>
+    <div class="sec-lbl">Tech Stack</div><div style="margin-bottom:14px">${techPills}</div>
+    <div class="sec-lbl">Key Executives (${d.executives.length})</div>
+    <table class="et"><thead><tr><th>Name</th><th>Title</th><th>LinkedIn</th></tr></thead><tbody>${execRows}</tbody></table>`;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+function closeModal(){document.getElementById('modal-overlay').classList.remove('open');}
+
+// ── NAV ───────────────────────────────────────────────────────────────
+function show(id) {
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('sec-'+id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n=>{if((n.getAttribute('onclick')||'').includes("'"+id+"'"))n.classList.add('active');});
+  setTimeout(buildCharts,60);
+  if(id==='companies') renderCoCards();
+  if(id==='all-execs') { buildExecs(); renderExecsPage(); }
+}
+
+// ── FILTERS INIT ──────────────────────────────────────────────────────
+function buildFilters() {
+  const segs = [...new Set(DATA.map(d=>d.segment))].sort();
+  const revs = ['<10M','10M-75M','75M-200M','200M-500M','500M-1B','1B-10B','10B+'].filter(r=>DATA.some(d=>d.revenue===r));
+  ['co-seg','ex-seg'].forEach(id=>{ const s=document.getElementById(id); if(s) segs.forEach(sg=>s.innerHTML+=`<option value="${sg}">${sg}</option>`); });
+  const cr=document.getElementById('co-rev'); if(cr) revs.forEach(r=>cr.innerHTML+=`<option value="${r}">${r}</option>`);
+}
+
+// ── GLOBAL SEARCH ─────────────────────────────────────────────────────
+function globalSearch(q) {
+  if(!q) return;
+  show('companies');
+  document.getElementById('co-q').value=q;
+  renderCoCards();
+}
+
+// ── EXPORT ALL ────────────────────────────────────────────────────────
+function exportAll() {
+  const rows=[['Company','Segment','Country','Revenue','Employees','Website','ABM Ref','Executive Name','Title','LinkedIn']];
+  DATA.forEach(c=>{
+    if(c.executives.length===0) rows.push([c.name,c.segment,c.country,c.revenue,c.employees,c.website,c.abm_ref,'','','']);
+    else c.executives.forEach(e=>rows.push([c.name,c.segment,c.country,c.revenue,c.employees,c.website,c.abm_ref,e.name,e.title,e.url]));
+  });
+  dlCSV(rows,'birdie_abm_lookalikes_full.csv');
+}
+
+// ── CSV DOWNLOAD ──────────────────────────────────────────────────────
+function dlCSV(rows, filename) {
+  const csv = rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+  a.download = filename; a.click();
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────
+buildFilters();
+buildCharts();
+renderCoCards();
+</script>
+</body>
+</html>
